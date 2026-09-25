@@ -20,11 +20,27 @@
 | BSS84 | [NXP/Nexperia Rev.06, 2008-12-16](https://assets.nexperia.com/documents/data-sheet/BSS84.pdf), Fig.4/6, 정격/열 표 | PMOS 출력·전달 특성 절댓값 |
 | GPIO | [STM32G0B1 DS13560 Rev.6](https://www.st.com/resource/en/datasheet/stm32g0b1cc.pdf), Table57 및 전류 정격 표 | 일반 non-FT_c, non-PC13/14/15 I/O, VDD 2.7~3.6V |
 
-### 기존 KT-0805 7종
+### KT-0805 7종 — 원문 출처 복구
 
-기존 AI 입력값의 제조사 revision과 측정 전류를 신뢰할 수 있는 원문에 모두 대조하지 못했습니다. 따라서 기존 Vf 직선은 비교용 `legacy-unverified`로 남기고, 불명확한 If 최대값·광도·온도 특성은 **unknown/null**입니다. LCSC 제품 번호는 원문 문서의 대체 증거가 아닙니다.
+초기 Gemini 소스에 C2295/C2297/C2293/C2292/C2296/C110371/C34499의 LCSC datasheet URL이 이미 기록되어 있었습니다. 이를 다시 열어 원문 조건을 복구했으며, 전부를 `legacy-unverified`로 취급하던 중간 dev 상태는 폐기했습니다.
 
-기존 프리셋은 `미검증` 판정과 경고를 항상 표시합니다. 이는 데이터 감사에서 미확인으로 분류한 것이며 해당 KT 제품을 물리적으로 검증했다는 뜻이 아닙니다. 확인된 원문을 확보하면 정확한 품번/revision별로 시험전류와 곡선을 추가하는 후속 데이터 작업이 필요합니다.
+| LED | LCSC | 원문 상태 | 핵심 시험조건 / 절대정격 |
+|---|---|---|---|
+| KT-0805R | C2295 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 1.8–2.4V @10mA; IV 85–210mcd @20mA; IF 25mA; Pd 40mW |
+| KT-0805G | C2297 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 2.6–3.1V @5mA; IV 175–430mcd @5mA; IF 30mA; Pd 100mW |
+| KT-0805B | C2293 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 2.6–3.1V @5mA; IV 34–100mcd @5mA; IF 30mA; Pd 100mW |
+| KT-0805YG | C2292 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 1.8–2.4V @10mA; IV 24–70mcd @20mA; IF 25mA; Pd 40mW |
+| KT-0805Y | C2296 | LCSC/JLCPCB 원문 표 확인, curve는 이번 PR에서 미 digitize | Vf 1.8–2.4V @10mA; IV 70–175mcd @20mA; IF 25mA; Pd 40mW |
+| KT-0805O | C110371 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 1.8–2.4V @10mA; IV 70–175mcd @20mA; IF 25mA; Pd 40mW |
+| KT-0805W | C34499 | C34499-associated KENTO A3, 2017-05-16을 pin | Vf 2.6–3.2V @5mA; IV typ 350mcd @5mA; IF 25mA; Pd 80mW |
+
+R/G/B/YG/O는 같은 원문에 실린 Typical Electrical-Optical Characteristics Curves를 거칠게 수동 판독하여 `manual-curve`로 사용합니다. 곡선은 전형값이며 생산 분포의 보증곡선이 아닙니다. R/YG/O의 p.3 Vf 행은 10mA인데 p.4 voltage-bin 표는20mA이므로 서로 다른 시험조건으로 따로 저장합니다.
+
+Y는 source/table은 확인했지만 이번 audit에서 같은 원문의 characteristic curve를 안정적으로 digitize하지 못했습니다. 따라서 `datasheet-table-only`로 두고 1.8–2.4V 범위의 가운데 2.1V를 **명시적 계산 가정**으로만 사용합니다. 해당 시험전류에서 벗어나면 외삽 플래그를 냅니다.
+
+White C34499는 웹의 다른 mirror에 같은 제품명/비슷한 revision을 가진 사본이 있으나 Pd, IF 및 광학 시험조건이 C34499-associated LCSC 문서와 충돌합니다. 이 모델은 **LCSC에 직접 연결된 A3 2017-05-16 문서**만 pin하고 다른 mirror의 숫자를 합치지 않습니다. 동일 source의 current-dependence curve를 이번 PR에서 확인하지 못했으므로 Vf는 2.6–3.2V의 midpoint 2.9V를 명시적 table-only 가정으로 사용하고, 광도 350mcd는 정확히5mA/25°C 시험점에서만 반환합니다.
+
+R/G/B/YG/Y/O의 데이터시트 광도는 min/max bin 범위이고 단일 typ 절대광도가 아닙니다. 상대 광도 곡선은 보관하더라도 그 범위를 임의의 midpoint “typ mcd”로 바꾸지 않으며, 현재 UI의 scalar mcd 출력은 `null`입니다. 추후 bin 선택/범위 출력 UI를 별도 구현할 수 있습니다.
 
 ## 수학 모델의 구현 선택
 

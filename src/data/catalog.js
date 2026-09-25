@@ -2,6 +2,13 @@
  * Numerical SI values are kept separate from limits and from model assumptions. */
 export const SOURCES = {
     kingbright: { manufacturer: 'Kingbright', revision: 'V.21A / 2025-03-17', url: 'https://www.kingbrightusa.com/images/catalog/SPEC/APT2012SURCK.pdf' },
+    kentoR: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2295.pdf' },
+    kentoG: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2297.pdf' },
+    kentoB: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2293.pdf' },
+    kentoYG: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2292.pdf' },
+    kentoY: { manufacturer: 'Hubei KENTO', revision: 'LCSC C2296 sheet; revision text not machine-extracted', url: 'https://www.lcsc.com/datasheet/C2296.pdf' },
+    kentoO: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C110371.pdf' },
+    kentoW: { manufacturer: 'Shenzhen/Hubei KENTO', revision: 'A3 / 2017-05-16 · C34499-associated sheet', url: 'https://datasheet.lcsc.com/lcsc/2305091500_Hubei-KENTO-Elec-KT-0805W_C34499.pdf' },
     dtc: { manufacturer: 'ROHM', revision: 'Rev.002 / 2016-03-25', url: 'https://fscdn.rohm.com/en/products/databook/datasheet/discrete/transistor/digital/dtc043zebtl-e.pdf' },
     npn: { manufacturer: 'onsemi', revision: 'Rev.14 / 2021-08', url: 'https://www.onsemi.com/download/data-sheet/pdf/mmbt3904lt1-d.pdf' },
     pnp: { manufacturer: 'Nexperia', revision: 'Rev.9 / 2022-07-01', url: 'https://assets.nexperia.com/documents/data-sheet/BC856_BC857_BC858.pdf' },
@@ -33,25 +40,83 @@ export const LEDS = {
         notes: ['Distinct reference LED; not a substitute model for KT-0805.', 'Typical curves are not production min/max envelopes.'],
     },
 };
-// Preserve previous selections without pretending the old AI-entered values were verified.
-// None of the old If(max)=30mA or mcd numbers is used as a verified limit/optical result.
-const legacy = [
-    ['KT-0805R', 'Red', '#e85060', 1.8, 2.0, 'C2295'],
-    ['KT-0805G', 'Green', '#38b078', 2.7, 3.2, 'C2297'],
-    ['KT-0805B', 'Blue', '#5599ed', 2.7, 3.1, 'C2293'],
-    ['KT-0805YG', 'Yellow-green', '#b1c94c', 1.9, 2.1, 'C2292'],
-    ['KT-0805Y', 'Yellow', '#d7ae39', 1.8, 2.0, 'C2296'],
-    ['KT-0805O', 'Orange', '#ef933f', 1.8, 2.0, 'C110371'],
-    ['KT-0805W', 'White', '#dde5ef', 2.7, 3.1, 'C34499'],
-];
-for (const [id, colorName, color, intercept, vf, lcscId] of legacy) {
-    LEDS[id] = {
-        id, name: `${id} (${colorName}) · 미검증 기존값`, color, source: `legacy-${id}`, kind: 'legacy-unverified', lcscId,
-        linear: { intercept, resistance: (vf - intercept) / .02, domain: [.001, .03] }, optical: null, limits: {},
-        notes: ['Original source values retained for comparison only. Datasheet revision/test current and absolute limits remain unverified.', 'No optical output or pass verdict for this preset; select a sourced reference or add reviewed data to the catalog.'],
-    };
-    SOURCES[`legacy-${id}`] = { manufacturer: 'Hubei KENTO (unverified model)', revision: 'Not verified', url: `https://www.lcsc.com/product-detail/${lcscId}.html` };
-}
+// KENTO KT-0805 family. Datasheet curves are coarse manual readings of the exact LCSC-linked sheets.
+// Electrical tables and typical curves are kept distinct; no midpoint is presented as a guaranteed typical value.
+const kentoTemp = (source) => graph(source, 'p.5 Relative intensity vs. ambient temperature', 'Ta curve; typical, coarse manual reading', [[-40, 1.10], [0, 1.04], [25, 1.00], [50, .95], [85, .86]], false);
+const kentoDerating = (source, rated, end) => graph(source, 'p.5 Maximum forward current vs. ambient temperature', 'typical/reference derating graphic', [[-40, rated], [25, rated], [85, end]], false);
+const kentoOptical = (source, testCurrent, minMcd, maxMcd, points) => ({
+    nominalMcd: null, minMcd, maxMcd, testCurrent,
+    convention: 'Datasheet gives a min/max intensity bin range, not a single typical absolute-intensity anchor.',
+    relative: graph(source, 'p.5 Relative intensity vs. forward current', 'Ta=25°C; normalized near 20mA; typical, coarse manual reading', mA(points), false),
+    temperature: kentoTemp(source),
+});
+Object.assign(LEDS, {
+    'KT-0805R': {
+        id: 'KT-0805R', name: 'KT-0805R (Red) · Hubei KENTO', color: '#e85060', source: 'kentoR', kind: 'manual-curve', lcscId: 'C2295',
+        vf: graph('kentoR', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, coarse manual reading', mA([[1,1.87],[5,1.95],[10,2.00],[15,2.04],[20,2.08],[25,2.11],[30,2.14],[35,2.17]]), false),
+        vfTest: { current: .01, min: 1.8, typ: null, max: 2.4, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
+        vfBins: { current: .02, min: 1.8, max: 2.4, condition: 'p.4 voltage bin table; note different current from p.3 Vf row' },
+        optical: kentoOptical('kentoR', .02, 85, 210, [[0,0],[5,.28],[10,.52],[15,.76],[20,1],[25,1.18],[30,1.36],[35,1.46],[40,1.55]]),
+        limits: { current: .025, pulseCurrent: .06, power: .04, reverse: 5, maxTemperature: 85, minTemperature: -40 },
+        currentDerating: kentoDerating('kentoR', .025, .006),
+        notes: ['Vf table: 1.8–2.4V @10mA; voltage-bin table separately uses20mA.', 'IV is 85–210mcd @20mA: no single absolute typical mcd is invented.'],
+    },
+    'KT-0805G': {
+        id: 'KT-0805G', name: 'KT-0805G (Emerald Green) · Hubei KENTO', color: '#38b078', source: 'kentoG', kind: 'manual-curve', lcscId: 'C2297',
+        vf: graph('kentoG', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, coarse manual reading', mA([[1,2.40],[5,2.63],[10,2.82],[15,2.95],[20,3.04],[25,3.11],[30,3.16],[35,3.20],[40,3.24]]), false),
+        vfTest: { current: .005, min: 2.6, typ: null, max: 3.1, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
+        optical: kentoOptical('kentoG', .005, 175, 430, [[0,0],[5,.40],[10,.65],[15,.84],[20,1],[25,1.12],[30,1.23],[35,1.33],[40,1.40]]),
+        limits: { current: .03, pulseCurrent: .06, power: .10, reverse: 5, maxTemperature: 85, minTemperature: -40 },
+        currentDerating: kentoDerating('kentoG', .03, .007),
+        notes: ['Vf 2.6–3.1V and IV 175–430mcd are both specified @5mA.', 'Absolute DC current is30mA; 60mA is a pulsed rating, not DC.'],
+    },
+    'KT-0805B': {
+        id: 'KT-0805B', name: 'KT-0805B (Blue) · Hubei KENTO', color: '#5599ed', source: 'kentoB', kind: 'manual-curve', lcscId: 'C2293',
+        vf: graph('kentoB', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, coarse manual reading', mA([[1,2.65],[5,2.80],[10,2.90],[15,2.97],[20,3.02],[25,3.06],[30,3.10],[35,3.13],[40,3.15]]), false),
+        vfTest: { current: .005, min: 2.6, typ: null, max: 3.1, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
+        optical: kentoOptical('kentoB', .005, 34, 100, [[0,0],[5,.35],[10,.57],[15,.80],[20,1],[25,1.12],[30,1.25],[35,1.40],[40,1.50]]),
+        limits: { current: .03, pulseCurrent: .06, power: .10, reverse: 5, maxTemperature: 85, minTemperature: -40 },
+        currentDerating: kentoDerating('kentoB', .03, .007),
+        notes: ['Vf 2.6–3.1V and IV 34–100mcd are both specified @5mA.', 'Typical curve is not a production min/max envelope.'],
+    },
+    'KT-0805YG': {
+        id: 'KT-0805YG', name: 'KT-0805YG (Yellow-green) · Hubei KENTO', color: '#b1c94c', source: 'kentoYG', kind: 'manual-curve', lcscId: 'C2292',
+        vf: graph('kentoYG', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, coarse manual reading', mA([[1,1.87],[5,1.93],[10,1.97],[20,2.02],[30,2.05],[35,2.07]]), false),
+        vfTest: { current: .01, min: 1.8, typ: null, max: 2.4, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
+        vfBins: { current: .02, min: 1.8, max: 2.4, condition: 'p.4 voltage bin table' },
+        optical: kentoOptical('kentoYG', .02, 24, 70, [[0,0],[5,.30],[10,.63],[15,.84],[20,1],[25,1.10],[30,1.16],[35,1.20],[40,1.21]]),
+        limits: { current: .025, pulseCurrent: .06, power: .04, reverse: 5, maxTemperature: 85, minTemperature: -40 },
+        currentDerating: kentoDerating('kentoYG', .025, .006),
+        notes: ['Vf table is 1.8–2.4V @10mA; IV is24–70mcd @20mA.', 'Absolute DC current is25mA.'],
+    },
+    'KT-0805Y': {
+        id: 'KT-0805Y', name: 'KT-0805Y (Yellow) · Hubei KENTO', color: '#d7ae39', source: 'kentoY', kind: 'datasheet-table-only', lcscId: 'C2296',
+        vfTableOnly: { current: .01, min: 1.8, max: 2.4, nominalAssumption: 2.1, condition: 'LCSC/JLCPCB datasheet characteristic table, Ta=25°C' },
+        vfTest: { current: .01, min: 1.8, typ: null, max: 2.4, condition: 'Electrical/optical characteristics, Ta=25°C' },
+        optical: { nominalMcd: null, minMcd: 70, maxMcd: 175, testCurrent: .02, relative: null, temperature: null, convention: 'Absolute intensity range only; current-dependence curve not digitized in this audit.' },
+        limits: { current: .025, pulseCurrent: .06, power: .04, reverse: 5, maxTemperature: 85, minTemperature: -40 },
+        notes: ['Source and table values are verified, but its characteristic curve is not digitized in this PR.', 'Vf uses an explicitly labeled midpoint approximation; IV 70–175mcd @20mA has no invented typical value.'],
+    },
+    'KT-0805O': {
+        id: 'KT-0805O', name: 'KT-0805O (Orange) · Hubei KENTO', color: '#ef933f', source: 'kentoO', kind: 'manual-curve', lcscId: 'C110371',
+        vf: graph('kentoO', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, coarse manual reading', mA([[1,1.85],[5,1.94],[10,1.99],[20,2.04],[30,2.08],[35,2.10]]), false),
+        vfTest: { current: .01, min: 1.8, typ: null, max: 2.4, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
+        vfBins: { current: .02, min: 1.8, max: 2.4, condition: 'p.4 voltage bin table' },
+        optical: kentoOptical('kentoO', .02, 70, 175, [[0,0],[5,.32],[10,.62],[15,.84],[20,1],[25,1.10],[30,1.16],[35,1.18],[40,1.16]]),
+        limits: { current: .025, pulseCurrent: .06, power: .04, reverse: 5, maxTemperature: 85, minTemperature: -40 },
+        currentDerating: kentoDerating('kentoO', .025, .006),
+        notes: ['Vf table is 1.8–2.4V @10mA; IV is70–175mcd @20mA.', 'Typical curve points were read from the same C110371 approval sheet.'],
+    },
+    'KT-0805W': {
+        id: 'KT-0805W', name: 'KT-0805W (White) · KENTO C34499 A3', color: '#dde5ef', source: 'kentoW', kind: 'datasheet-table-only', lcscId: 'C34499',
+        vfTableOnly: { current: .005, min: 2.6, max: 3.2, nominalAssumption: 2.9, condition: 'A3 p.3 Electrical/optical characteristics, Ta=25°C' },
+        vfTest: { current: .005, min: 2.6, typ: null, max: 3.2, condition: 'A3 p.3, Ta=25°C' },
+        optical: { nominalMcd: 350, minMcd: null, maxMcd: null, testCurrent: .005, relative: null, temperature: null, convention: 'A3 p.3 typical absolute intensity @5mA. No same-source relative-current curve digitized.' },
+        limits: { current: .025, pulseCurrent: .10, power: .08, reverse: 5, maxTemperature: 85, minTemperature: -30 },
+        notes: ['Pinned to the C34499-associated A3 2017-05-16 sheet: Vf 2.6–3.2V @5mA, IV typ350mcd @5mA.', 'Other web mirrors expose conflicting electrical ratings/conditions; they are intentionally not mixed into this model.', 'JLCPCB summary “Test Current25mA” is treated as distributor metadata, not the p.3 Vf/IV test condition.'],
+    },
+});
+
 export const BJTS = {
     npn: {
         id: 'MMBT3904LT1G', name: 'MMBT3904LT1G · onsemi', source: 'npn', polarity: 'npn', ratio: 10,

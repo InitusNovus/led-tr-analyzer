@@ -11,18 +11,46 @@ test('Kingbright electrical/photometric reference points are not mixed with star
     near(luminousIntensity('APT2012SURCK', 0), 0);
     assert.equal(LEDS.APT2012SURCK.vfTest.min, null);
 });
-test('legacy models stay selectable, but do not invent optical/absolute-limit evidence', () => {
-    for (const [id, p] of Object.entries(LEDS).filter(([, p]) => p.kind === 'legacy-unverified')) {
+test('KT-0805 datasheet links are sourced and absolute limits are no longer synthetic', () => {
+    for (const id of ['KT-0805R','KT-0805G','KT-0805B','KT-0805YG','KT-0805Y','KT-0805O','KT-0805W']) {
+        const p = LEDS[id], src = SOURCES[p.source];
+        assert.ok(src.manufacturer.includes('KENTO'));
+        assert.ok(src.url.startsWith('https://'));
+        assert.ok(Number.isFinite(p.limits.current) && p.limits.current > 0);
+        assert.ok(Number.isFinite(p.limits.power) && p.limits.power > 0);
         const ctx = context();
-        assert.ok(ledVoltage(id, .01, 25, 0, ctx) > 0);
-        assert.equal(luminousIntensity(id, .01), null);
-        assert.equal(p.limits.current, undefined);
-        assert.ok(ctx.flags.has('legacy-led-unverified'));
+        assert.ok(ledVoltage(id, p.vfTest.current, 25, 0, ctx) > 0);
+        assert.equal(ctx.flags.has('legacy-led-unverified'), false);
+    }
+    near(LEDS['KT-0805R'].limits.current, .025);
+    near(LEDS['KT-0805G'].limits.current, .03);
+    near(LEDS['KT-0805W'].limits.power, .08);
+});
+test('KT table-only Y/W models expose midpoint/current-shape assumptions instead of fake curves', () => {
+    for (const id of ['KT-0805Y','KT-0805W']) {
+        const p = LEDS[id], ctx = context();
+        near(ledVoltage(id, p.vfTest.current, 25, 0, ctx), p.vfTableOnly.nominalAssumption);
+        assert.ok(ctx.flags.has('approximation:LED-table-midpoint'));
+        const away = context();
+        ledVoltage(id, p.vfTest.current * 2, 25, 0, away);
+        assert.ok(away.flags.has('extrapolation:LED-table-only-current'));
+    }
+    near(luminousIntensity('KT-0805W', .005, 25, context()), 350);
+    const whiteAway = context();
+    assert.equal(luminousIntensity('KT-0805W', .01, 25, whiteAway), null);
+    assert.ok(whiteAway.flags.has('not-modeled:LED-optical-current-shape'));
+});
+test('KT min/max intensity ranges are not converted into invented typical mcd', () => {
+    for (const id of ['KT-0805R','KT-0805G','KT-0805B','KT-0805YG','KT-0805Y','KT-0805O']) {
+        const ctx = context();
+        assert.equal(luminousIntensity(id, LEDS[id].optical.testCurrent, 25, ctx), null);
+        assert.ok(ctx.flags.has('not-modeled:LED-absolute-optical-anchor'));
     }
 });
 test('curve endpoints are preserved and provenance is resolvable', () => {
+    const ktCurves = Object.values(LEDS).flatMap(p => [p.vf, p.optical?.relative, p.optical?.temperature, p.currentDerating].filter(Boolean));
     const curves = [LEDS.APT2012SURCK.vf, LEDS.APT2012SURCK.optical.relative, LEDS.APT2012SURCK.optical.temperature,
-        DIGITAL.on, DIGITAL.gain, GPIO.drop, ...Object.values(BJTS).flatMap(p => [p.gain, p.vbe, p.vbeSat, p.vceSat])];
+        ...ktCurves, DIGITAL.on, DIGITAL.gain, GPIO.drop, ...Object.values(BJTS).flatMap(p => [p.gain, p.vbe, p.vbeSat, p.vceSat])];
     for (const curve of curves) {
         assert.ok(SOURCES[curve.source].url.startsWith('https://'));
         assert.ok(curve.figure && curve.conditions && curve.kind);

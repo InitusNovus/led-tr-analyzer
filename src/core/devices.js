@@ -38,6 +38,15 @@ export function ledVoltage(id, current, temperature = 25, shift = 0, ctx) {
                 ctx?.flags.add('extrapolation:LED-temperature');
         }
     }
+    else if (part.vfTableOnly) {
+        const t = part.vfTableOnly;
+        v = t.nominalAssumption;
+        ctx?.flags.add('approximation:LED-table-midpoint');
+        if (Math.abs(current - t.current) > Math.max(1e-9, t.current * .01))
+            ctx?.flags.add('extrapolation:LED-table-only-current');
+        if (temperature !== 25)
+            ctx?.flags.add('not-modeled:LED-temperature');
+    }
     else {
         const { intercept, resistance, domain } = part.linear;
         v = current < domain[0] ? (intercept + resistance * domain[0]) * current / domain[0] : intercept + resistance * current;
@@ -59,8 +68,22 @@ export function luminousIntensity(id, current, temperature = 25, ctx) {
     const o = part.optical;
     if (current === 0)
         return 0;
+    if (!Number.isFinite(o.nominalMcd)) {
+        ctx?.flags.add('not-modeled:LED-absolute-optical-anchor');
+        return null;
+    }
+    if (!o.relative) {
+        if (Math.abs(current - o.testCurrent) <= Math.max(1e-9, o.testCurrent * .01) && temperature === 25)
+            return o.nominalMcd;
+        ctx?.flags.add('not-modeled:LED-optical-current-shape');
+        return null;
+    }
     let relative = sample(o.relative, current, ctx, 'LED-optical-current');
     if (temperature !== 25) {
+        if (!o.temperature) {
+            ctx?.flags.add('not-modeled:LED-optical-temperature');
+            return null;
+        }
         relative *= sample(o.temperature, temperature, ctx, 'LED-optical-temperature');
         ctx?.flags.add('approximation:optical-temperature-separable');
     }

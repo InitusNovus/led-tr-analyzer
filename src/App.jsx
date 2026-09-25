@@ -7,7 +7,10 @@ import CircuitDiagram from './components/CircuitDiagram.jsx';
 import './index.css';
 const show = (v, scale = 1, unit = '') => v == null || !Number.isFinite(v) ? '—' : `${(v * scale).toLocaleString('en-US', { maximumSignificantDigits: 4 })}${unit ? ' ' + unit : ''}`;
 const FLAGS = {
-    'legacy-led-unverified': '기존 KT-0805 수치는 미검증입니다. 전류·전압 비교용으로만 유지하며 광도·정격 판정을 하지 않습니다.',
+    'legacy-led-unverified': 'legacy LED 데이터입니다. 검증된 원문 모델이 있으면 그 모델을 선택하세요.',
+    'approximation:LED-table-midpoint': 'LED: 데이터시트에 typ Vf가 없어 min/max 가운데값을 계산 가정으로 사용합니다.',
+    'not-modeled:LED-absolute-optical-anchor': 'LED: 절대 광도는 min/max 범위만 있고 typ 기준값이 없어 단일 mcd 값을 만들지 않습니다.',
+    'not-modeled:LED-optical-current-shape': 'LED: 해당 시험점의 광도는 있지만 같은 원문의 전류-광도 곡선을 모델링하지 않았습니다.',
     'approximation:GPIO-limit-points-not-typical': 'GPIO: 한계 시험점을 잇는 가정 곡선입니다. 전형적인 출력 특성으로 보증하지 않습니다.',
     'approximation:BJT-active-saturation-bridge': 'BJT: 활성/포화 곡선 사이와 다른 VCE 조건을 근사 연결합니다.',
     'approximation:BJT-strong-base-drive': 'BJT: 강한 베이스 구동 구간은 지정 강제 전류비 곡선 아래의 근사입니다.',
@@ -68,9 +71,9 @@ export default function App() {
             setConfig(c => ({ ...c, topology: next.id, state: next.active === 'LOW' ? 'LOW' : 'HIGH' }));
         }}>{TOPOLOGIES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
             <p className="subtle">{t.active === 'always' ? '항상 연결된 기준 회로' : `${t.active}로 켜지는 구성 · 반대 상태/Hi-Z도 검사하세요.`}</p>
-            <label className="field" htmlFor="led"><span>LED</span><select id="led" value={config.led} onChange={e => { set('led', e.target.value); if (!LEDS[e.target.value].optical)
+            <label className="field" htmlFor="led"><span>LED</span><select id="led" value={config.led} onChange={e => { set('led', e.target.value); if (!Number.isFinite(LEDS[e.target.value].optical?.nominalMcd) || !LEDS[e.target.value].optical?.relative)
         setTargetKind('current'); }}>{Object.values(LEDS).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-            <p className="subtle">기존 KT-0805 프리셋은 미검증으로 보존했습니다. Kingbright는 별도 실부품 모델입니다.</p>
+            <p className="subtle">KT-0805 7종은 원문 LCSC/KENTO 자료에 연결됩니다. Y/W는 이번 버전에서 table-only 근사이며, Kingbright는 별도 reference LED입니다.</p>
             <div className="fields two">{number('vcc', 'LED / 컬렉터 전원', 'V')}{number('vdd', 'GPIO 전원', 'V')}{number('seriesCount', '직렬 LED 개수', '개', 1)}{number('temperature', '전기 모델 온도', '°C')}</div>
             <CircuitDiagram config={config} point={p}/>
           </section>
@@ -98,7 +101,7 @@ export default function App() {
             <div className="tabs" role="group" aria-label="계산 모드"><button className={mode === 'verify' ? 'active' : ''} onClick={() => setMode('verify')}>저항으로 검증</button><button className={mode === 'size' ? 'active' : ''} onClick={() => setMode('size')}>목표에서 저항 선정</button></div>
             {mode === 'verify' ? <NumberField name="resistance" label="RLED · LED 직렬저항" unit="Ω" value={config.resistance} onChange={v => set('resistance', v)}/> : <>
               <div className="fields two"><NumberField name="target" label={targetKind === 'mcd' ? '목표 광도 (선형 상대곡선)' : '목표 LED 전류'} unit={targetKind === 'mcd' ? 'mcd' : 'mA'} value={target} onChange={setTarget}/>
-                <label className="field" htmlFor="target-kind"><span>목표 단위</span><select id="target-kind" value={targetKind} onChange={e => setTargetKind(e.target.value)}><option value="current">전류</option><option value="mcd" disabled={!led.optical}>광도 · 근사</option></select></label></div>
+                <label className="field" htmlFor="target-kind"><span>목표 단위</span><select id="target-kind" value={targetKind} onChange={e => setTargetKind(e.target.value)}><option value="current">전류</option><option value="mcd" disabled={!Number.isFinite(led.optical?.nominalMcd) || !led.optical?.relative}>광도 · 근사</option></select></label></div>
               <div className="fields two"><label className="field" htmlFor="series"><span>E-series</span><select id="series" value={series} onChange={e => setSeries(e.target.value)}>{['E24', 'E96', 'E24+E96'].map(s => <option key={s}>{s}</option>)}</select></label>
                 <label className="field" htmlFor="strategy"><span>표준값 선택</span><select id="strategy" value={strategy} onChange={e => setStrategy(e.target.value)}><option value="closest">가장 가까운 저항</option><option value="safe">큰 저항 (nominal 기준)</option><option value="bright">작은 저항</option></select></label></div>
               {result.sizing && <div className="selection" data-testid="selected-resistance"><span>선택 {show(result.sizing.selected, 1, 'Ω')}</span><small>연속값 {show(result.sizing.exact, 1, 'Ω')}</small><button onClick={() => { set('resistance', result.sizing.selected); setMode('verify'); }}>검증 모드에 적용</button></div>}
