@@ -42,7 +42,9 @@ export function ledVoltage(id, current, temperature = 25, shift = 0, ctx) {
         const t = part.vfTableOnly;
         v = t.nominalAssumption;
         ctx?.flags.add('approximation:LED-table-midpoint');
-        if (Math.abs(current - t.current) > Math.max(1e-9, t.current * .01))
+        if (!Number.isFinite(t.current))
+            ctx?.flags.add('not-modeled:LED-vf-current-shape');
+        else if (Math.abs(current - t.current) > Math.max(1e-9, t.current * .01))
             ctx?.flags.add('extrapolation:LED-table-only-current');
         if (temperature !== 25)
             ctx?.flags.add('not-modeled:LED-temperature');
