@@ -79,7 +79,7 @@ try:
         check(not any(x in page.locator('body').inner_text() for x in ['NaN', 'Infinity']), 'No non-finite values rendered')
         page.locator('#resistance').fill('330')
         page.locator('#led').select_option('KT-0805R')
-        expect(page.locator('.status')).to_contain_text('미검증')
+        check('미검증' not in page.locator('.status').inner_text(), 'Sourced KT preset is no longer legacy-unverified')
         expect(page.locator('.metric').nth(5).locator('strong')).to_have_text('—')
         checks += 2
         page.locator('#led').select_option('APT2012SURCK')
