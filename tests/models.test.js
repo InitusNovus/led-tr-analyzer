@@ -16,10 +16,13 @@ test('KT-0805 datasheet links are sourced and absolute limits are no longer synt
         const p = LEDS[id], src = SOURCES[p.source];
         assert.ok(src.manufacturer.includes('KENTO'));
         assert.ok(src.url.startsWith('https://'));
-        assert.ok(Number.isFinite(p.limits.current) && p.limits.current > 0);
+        if (id !== 'KT-0805Y')
+            assert.ok(Number.isFinite(p.limits.current) && p.limits.current > 0);
+        else
+            assert.equal(p.limits.current, null);
         assert.ok(Number.isFinite(p.limits.power) && p.limits.power > 0);
         const ctx = context();
-        assert.ok(ledVoltage(id, p.vfTest.current, 25, 0, ctx) > 0);
+        assert.ok(ledVoltage(id, Number.isFinite(p.vfTest.current) ? p.vfTest.current : .01, 25, 0, ctx) > 0);
         assert.equal(ctx.flags.has('legacy-led-unverified'), false);
     }
     near(LEDS['KT-0805R'].limits.current, .025);
@@ -27,14 +30,19 @@ test('KT-0805 datasheet links are sourced and absolute limits are no longer synt
     near(LEDS['KT-0805W'].limits.power, .08);
 });
 test('KT table-only Y/W models expose midpoint/current-shape assumptions instead of fake curves', () => {
-    for (const id of ['KT-0805Y','KT-0805W']) {
-        const p = LEDS[id], ctx = context();
-        near(ledVoltage(id, p.vfTest.current, 25, 0, ctx), p.vfTableOnly.nominalAssumption);
-        assert.ok(ctx.flags.has('approximation:LED-table-midpoint'));
-        const away = context();
-        ledVoltage(id, p.vfTest.current * 2, 25, 0, away);
-        assert.ok(away.flags.has('extrapolation:LED-table-only-current'));
-    }
+    const y = context();
+    near(ledVoltage('KT-0805Y', .01, 25, 0, y), LEDS['KT-0805Y'].vfTableOnly.nominalAssumption);
+    assert.ok(y.flags.has('approximation:LED-table-midpoint'));
+    assert.ok(y.flags.has('not-modeled:LED-vf-current-shape'));
+    assert.equal(LEDS['KT-0805Y'].limits.current, null);
+    assert.equal(luminousIntensity('KT-0805Y', .02, 25, context()), null);
+
+    const w = LEDS['KT-0805W'], wc = context();
+    near(ledVoltage('KT-0805W', w.vfTest.current, 25, 0, wc), w.vfTableOnly.nominalAssumption);
+    assert.ok(wc.flags.has('approximation:LED-table-midpoint'));
+    const away = context();
+    ledVoltage('KT-0805W', w.vfTest.current * 2, 25, 0, away);
+    assert.ok(away.flags.has('extrapolation:LED-table-only-current'));
     near(luminousIntensity('KT-0805W', .005, 25, context()), 350);
     const whiteAway = context();
     assert.equal(luminousIntensity('KT-0805W', .01, 25, whiteAway), null);
