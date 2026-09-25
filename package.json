@@ -1,11 +1,14 @@
 {
   "name": "led-tr-analyzer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "LED + digital transistor engineering calculator",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage tests/*.test.js",
+    "test:browser": "python scripts/browser_smoke.py"
   },
   "private": true,
   "type": "module",
