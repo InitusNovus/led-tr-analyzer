@@ -66,10 +66,12 @@ test('absolute current rating is detected, never used as a current clamp', () =>
     assert.ok(r.ok && r.point.current > .03);
     assert.equal(r.validation.status, 'limits-exceeded');
 });
-test('unverified legacy limits never produce a verified result', () => {
+test('sourced KT limits participate in validation without inventing absolute typical brightness', () => {
     const r = analyzePoint({ ...DEFAULT_CONFIG, led: 'KT-0805R' });
-    assert.equal(r.validation.status, 'unverified-limits');
+    assert.ok(r.ok);
+    assert.notEqual(r.validation.status, 'unverified-limits');
     assert.equal(r.point.luminousMcd, null);
+    assert.ok(r.validation.checks.some(x => x.id === 'LED current'));
 });
 test('sensitivity extrema preserve physical witnesses, including resistor power', () => {
     const result = analyzeCorners({ ...DEFAULT_CONFIG, topology: 'resistor', resistorTolerance: 5 });
