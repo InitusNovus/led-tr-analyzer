@@ -71,7 +71,7 @@ test('sourced KT limits participate in validation without inventing absolute typ
     assert.ok(r.ok);
     assert.notEqual(r.validation.status, 'unverified-limits');
     assert.equal(r.point.luminousMcd, null);
-    assert.ok(r.validation.checks.some(x => x.id === 'LED current'));
+    assert.ok(r.validation.checks.some(x => x.id === 'LED current / 각 LED'));
 });
 test('sensitivity extrema preserve physical witnesses, including resistor power', () => {
     const result = analyzeCorners({ ...DEFAULT_CONFIG, topology: 'resistor', resistorTolerance: 5 });
