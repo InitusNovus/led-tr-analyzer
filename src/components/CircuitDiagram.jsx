@@ -63,10 +63,18 @@ export default function CircuitDiagram({config,point,selectedInstance,onSelectIn
  const name=i=>i==='LED1'?led.id:(getDeviceModel(config.deviceModels?.[i])?.id??i);
  const pick={selected:selectedInstance,onSelect:onSelectInstance};
  const inputNpn=id!=='nmos-pmos',outPnp=id==='npn-pnp';
- const compoundOutput=outPnp?<Bjt id="Q2" x={520} y={92} name={name('Q2')} polarity="pnp" {...pick}/>:<Mos id="Q2" x={520} y={92} name={name('Q2')} polarity="pmos" {...pick}/>;
- const compoundInput=inputNpn?<Bjt id="Q1" x={245} y={292} name={name('Q1')} polarity="npn" {...pick}/>:<Mos id="Q1" x={245} y={292} name={name('Q1')} polarity="nmos" {...pick}/>;
- const compoundInputPull=!inputNpn?<><ResV id="RGS_IN" x={185} y={345} value={config.gatePull} label="RGS(in)" {...pick}/><Wire d="M185 292V305M185 385H249"/></>:null;
- const lowLoad=(driver,extra=null)=><>{<Rail/>}<Wire d="M470 45V60" on={loadOn}/><ResV id="RLED" x={470} y={88} value={point?.config.resistance??config.resistance} {...pick}/><Wire d="M470 128V145" on={loadOn}/><Led x={470} y={180} color={led.color} name={led.id} on={loadOn} {...pick}/><Wire d="M470 214V238" on={loadOn}/>{driver}{extra}</>;
+ const compoundOutput=outPnp
+   ? React.createElement(Bjt,{id:'Q2',x:520,y:92,name:name('Q2'),polarity:'pnp',...pick})
+   : React.createElement(Mos,{id:'Q2',x:520,y:92,name:name('Q2'),polarity:'pmos',...pick});
+ const compoundInput=inputNpn
+   ? React.createElement(Bjt,{id:'Q1',x:245,y:292,name:name('Q1'),polarity:'npn',...pick})
+   : React.createElement(Mos,{id:'Q1',x:245,y:292,name:name('Q1'),polarity:'nmos',...pick});
+ const compoundInputPull=!inputNpn
+   ? React.createElement('g',{className:'input-pull-group'},
+       React.createElement(ResV,{id:'RGS_IN',x:185,y:345,value:config.gatePull,label:'RGS(in)',...pick}),
+       React.createElement(Wire,{d:'M185 292V305M185 385H249'}))
+   : null;
+ const lowLoad=(driver,extra=null)=><><Rail/><Wire d="M470 45V60" on={loadOn}/><ResV id="RLED" x={470} y={88} value={point?.config.resistance??config.resistance} {...pick}/><Wire d="M470 128V145" on={loadOn}/><Led x={470} y={180} color={led.color} name={led.id} on={loadOn} {...pick}/><Wire d="M470 214V238" on={loadOn}/>{driver}{extra}</>;
  const highLoad=(driver)=><><Rail/><Wire d="M470 45V55" on={loadOn}/>{driver}<Wire d="M470 137V150" on={loadOn}/><ResV id="RLED" x={470} y={180} value={point?.config.resistance??config.resistance} {...pick}/><Wire d="M470 220V238" on={loadOn}/><Led x={470} y={272} color={led.color} name={led.id} on={loadOn} {...pick}/><Wire d="M470 306V379" on={loadOn}/><Ground/></>;
  let body=null;
  if(id==='resistor') body=<><Rail/><Wire d="M470 45V60" on={loadOn}/><ResV id="RLED" x={470} y={90} value={point?.config.resistance??config.resistance} {...pick}/><Wire d="M470 130V150" on={loadOn}/><Led x={470} y={185} color={led.color} name={led.id} on={loadOn} {...pick}/><Wire d="M470 219V379" on={loadOn}/><Ground/></>;
