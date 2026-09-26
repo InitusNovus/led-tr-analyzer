@@ -63,6 +63,9 @@ export default function CircuitDiagram({config,point,selectedInstance,onSelectIn
  const name=i=>i==='LED1'?led.id:(getDeviceModel(config.deviceModels?.[i])?.id??i);
  const pick={selected:selectedInstance,onSelect:onSelectInstance};
  const inputNpn=id!=='nmos-pmos',outPnp=id==='npn-pnp';
+ const compoundOutput=outPnp?<Bjt id="Q2" x={520} y={92} name={name('Q2')} polarity="pnp" {...pick}/>:<Mos id="Q2" x={520} y={92} name={name('Q2')} polarity="pmos" {...pick}/>;
+ const compoundInput=inputNpn?<Bjt id="Q1" x={245} y={292} name={name('Q1')} polarity="npn" {...pick}/>:<Mos id="Q1" x={245} y={292} name={name('Q1')} polarity="nmos" {...pick}/>;
+ const compoundInputPull=!inputNpn?<><ResV id="RGS_IN" x={185} y={345} value={config.gatePull} label="RGS(in)" {...pick}/><Wire d="M185 292V305M185 385H249"/></>:null;
  const lowLoad=(driver,extra=null)=><>{<Rail/>}<Wire d="M470 45V60" on={loadOn}/><ResV id="RLED" x={470} y={88} value={point?.config.resistance??config.resistance} {...pick}/><Wire d="M470 128V145" on={loadOn}/><Led x={470} y={180} color={led.color} name={led.id} on={loadOn} {...pick}/><Wire d="M470 214V238" on={loadOn}/>{driver}{extra}</>;
  const highLoad=(driver)=><><Rail/><Wire d="M470 45V55" on={loadOn}/>{driver}<Wire d="M470 137V150" on={loadOn}/><ResV id="RLED" x={470} y={180} value={point?.config.resistance??config.resistance} {...pick}/><Wire d="M470 220V238" on={loadOn}/><Led x={470} y={272} color={led.color} name={led.id} on={loadOn} {...pick}/><Wire d="M470 306V379" on={loadOn}/><Ground/></>;
  let body=null;
@@ -77,13 +80,18 @@ export default function CircuitDiagram({config,point,selectedInstance,onSelectIn
  else if(id==='pnp-high') body=<>{highLoad(<Bjt id="Q1" x={470} y={95} name={name('Q1')} polarity="pnp" {...pick}/>)}<Gpio x={75} y={95} label={name('GPIO1')} state={stateText} {...pick}/><Wire d="M120 95H155" on={driveOn}/><ResH id="RB" x1={155} x2={405} y={95} value={config.baseResistance} {...pick}/></>;
  else if(id==='pmos-high') body=<>{highLoad(<Mos id="Q1" x={470} y={95} name={name('Q1')} polarity="pmos" {...pick}/>)}<Gpio x={75} y={95} label={name('GPIO1')} state={stateText} {...pick}/><Wire d="M120 95H145" on={driveOn}/><ResH id="RG" x1={145} x2={405} y={95} value={config.gateResistance} {...pick}/><ResV id="RGS" x={375} y={58} value={config.gatePull} label="RGS" {...pick}/><Wire d="M375 18H470V28M375 98V95" on={driveOn}/></>;
  else {
-   body=<><Rail x={520}/>{outPnp?<Bjt id="Q2" x={520} y={92} name={name('Q2')} polarity="pnp" {...pick}/>:<Mos id="Q2" x={520} y={92} name={name('Q2')} polarity="pmos" {...pick}/>}<Wire d="M520 134V148" on={loadOn}/><ResV id="RLED" x={520} y={178} value={point?.config.resistance??config.resistance} {...pick}/><Wire d="M520 218V235" on={loadOn}/><Led x={520} y={270} color={led.color} name={led.id} on={loadOn} {...pick}/><Wire d="M520 304V379" on={loadOn}/><Ground x={520}/>
-   {inputNpn?<Bjt id="Q1" x={245} y={292} name={name('Q1')} polarity="npn" {...pick}/>:<Mos id="Q1" x={245} y={292} name={name('Q1')} polarity="nmos" {...pick}/>}<Wire d="M249 334V379"/><Ground x={249}/>
-   <Gpio x={70} y={292} label={name('GPIO1')} state={stateText} {...pick}/><Wire d="M115 292H130" on={driveOn}/><ResH id={inputNpn?'RB':'RG'} x1={130} x2={180} y={292} value={inputNpn?config.baseResistance:config.gateResistance} {...pick}/><Wire d="M180 292H197" on={driveOn}/>
-   <Wire d="M249 250V130H415" on={driveOn}/><ResH id="Rdrive" x1={415} x2={455} y={130} value={config.gateResistance} label="Rdrive" {...pick}/><Wire d="M455 130H465V92" on={driveOn}/>
-   <ResV id={outPnp?'RBE':'RGS_OUT'} x={430} y={62} value={config.gatePull} label={outPnp?'RBE':'RGS(out)'} {...pick}/><Wire d="M430 22H520M430 102V130" on={driveOn}/>
-   {!inputNpn&&<><ResV id="RGS_IN" x={185} y={345} value={config.gatePull} label="RGS(in)" {...pick}/><Wire d="M185 292V305M185 385H249"/></>}
-   <text className="minor-label" x="335" y="405">RG/Rdrive 및 pull 값은 현재 공용 설정값입니다.</text></>;
+   body=(<>
+    <Rail x={520}/>{compoundOutput}<Wire d="M520 134V148" on={loadOn}/>
+    <ResV id="RLED" x={520} y={178} value={point?.config.resistance??config.resistance} {...pick}/><Wire d="M520 218V235" on={loadOn}/>
+    <Led x={520} y={270} color={led.color} name={led.id} on={loadOn} {...pick}/><Wire d="M520 304V379" on={loadOn}/><Ground x={520}/>
+    {compoundInput}<Wire d="M249 334V379"/><Ground x={249}/>
+    <Gpio x={70} y={292} label={name('GPIO1')} state={stateText} {...pick}/><Wire d="M115 292H130" on={driveOn}/>
+    <ResH id={inputNpn?'RB':'RG'} x1={130} x2={180} y={292} value={inputNpn?config.baseResistance:config.gateResistance} {...pick}/><Wire d="M180 292H197" on={driveOn}/>
+    <Wire d="M249 250V130H415" on={driveOn}/><ResH id="Rdrive" x1={415} x2={455} y={130} value={config.gateResistance} label="Rdrive" {...pick}/><Wire d="M455 130H465V92" on={driveOn}/>
+    <ResV id={outPnp?'RBE':'RGS_OUT'} x={430} y={62} value={config.gatePull} label={outPnp?'RBE':'RGS(out)'} {...pick}/><Wire d="M430 22H520M430 102V130" on={driveOn}/>
+    {compoundInputPull}
+    <text className="minor-label" x="335" y="405">RG/Rdrive 및 pull 값은 현재 공용 설정값입니다.</text>
+   </>);
  }
  return <figure className="schematic" data-topology={id}>
    <div className="schematic-head"><div><strong>{template?'회로 해석도':'회로'}</strong><span>{stateText??'GPIO 미사용'} · {point?.region??'미계산'}</span></div><span className={cls('current-pill',loadOn&&'on')}>{point?((point.current*1000).toPrecision(4)+' mA'):'—'}</span></div>
