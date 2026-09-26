@@ -80,7 +80,7 @@ export default function CircuitDiagram({config,point,selectedInstance,onSelectIn
  else if(id==='pnp-high') body=<>{highLoad(<Bjt id="Q1" x={470} y={95} name={name('Q1')} polarity="pnp" {...pick}/>)}<Gpio x={75} y={95} label={name('GPIO1')} state={stateText} {...pick}/><Wire d="M120 95H155" on={driveOn}/><ResH id="RB" x1={155} x2={405} y={95} value={config.baseResistance} {...pick}/></>;
  else if(id==='pmos-high') body=<>{highLoad(<Mos id="Q1" x={470} y={95} name={name('Q1')} polarity="pmos" {...pick}/>)}<Gpio x={75} y={95} label={name('GPIO1')} state={stateText} {...pick}/><Wire d="M120 95H145" on={driveOn}/><ResH id="RG" x1={145} x2={405} y={95} value={config.gateResistance} {...pick}/><ResV id="RGS" x={375} y={58} value={config.gatePull} label="RGS" {...pick}/><Wire d="M375 18H470V28M375 98V95" on={driveOn}/></>;
  else {
-   body=(<>
+   body=(<g className="compound-body">
     <Rail x={520}/>{compoundOutput}<Wire d="M520 134V148" on={loadOn}/>
     <ResV id="RLED" x={520} y={178} value={point?.config.resistance??config.resistance} {...pick}/><Wire d="M520 218V235" on={loadOn}/>
     <Led x={520} y={270} color={led.color} name={led.id} on={loadOn} {...pick}/><Wire d="M520 304V379" on={loadOn}/><Ground x={520}/>
@@ -91,7 +91,7 @@ export default function CircuitDiagram({config,point,selectedInstance,onSelectIn
     <ResV id={outPnp?'RBE':'RGS_OUT'} x={430} y={62} value={config.gatePull} label={outPnp?'RBE':'RGS(out)'} {...pick}/><Wire d="M430 22H520M430 102V130" on={driveOn}/>
     {compoundInputPull}
     <text className="minor-label" x="335" y="405">RG/Rdrive 및 pull 값은 현재 공용 설정값입니다.</text>
-   </>);
+   </g>);
  }
  return <figure className="schematic" data-topology={id}>
    <div className="schematic-head"><div><strong>{template?'회로 해석도':'회로'}</strong><span>{stateText??'GPIO 미사용'} · {point?.region??'미계산'}</span></div><span className={cls('current-pill',loadOn&&'on')}>{point?((point.current*1000).toPrecision(4)+' mA'):'—'}</span></div>
