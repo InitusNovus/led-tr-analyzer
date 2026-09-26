@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { TOPOLOGIES, DEFAULT_CONFIG, solvePoint, transitionConfig } from '../src/core/topologies.js';
 import { analyzePoint, analyzeCorners, selectResistance } from '../src/core/analysis.js';
 const near = (a, b, t = 1e-7) => assert.ok(Math.abs(a - b) <= t, `${a} != ${b}`);
-const active = t => ({ ...DEFAULT_CONFIG, topology: t.id, state: t.active === 'LOW' ? 'LOW' : 'HIGH' });
+const active = t => transitionConfig(DEFAULT_CONFIG, t.id);
 for (const t of TOPOLOGIES) {
     test(`${t.id}: finite DC, coherent resistor power and electrical power balance`, () => {
         const r = solvePoint(active(t));
@@ -32,33 +32,33 @@ for (const t of TOPOLOGIES) {
         });
 }
 test('follower LED current equals IE, not IC', () => {
-    const r = solvePoint({ ...DEFAULT_CONFIG, topology: 'npn-follower' });
+    const r = solvePoint(transitionConfig(DEFAULT_CONFIG, 'npn-follower'));
     near(r.current, r.emitterCurrent, 1e-12);
     near(r.sources[0].current + r.baseCurrent, r.current, 1e-8);
     assert.ok(r.nodes.emitter < r.gpioVoltage);
 });
 test('emitter current sink separates sensed IE from LED IC and holds current with headroom', () => {
-    const c = { ...DEFAULT_CONFIG, topology: 'npn-current-sink', resistance: 1, emitterResistance: 470 };
+    const c = { ...transitionConfig(DEFAULT_CONFIG, 'npn-current-sink'), resistance: 1, emitterResistance: 470 };
     const a = solvePoint({ ...c, vcc: 5 }), b = solvePoint({ ...c, vcc: 12 });
     near(a.current + a.baseCurrent, a.emitterCurrent, 1e-8);
     assert.ok(Math.abs(a.current / b.current - 1) < .02);
     assert.ok(b.driverPower > a.driverPower);
 });
 test('weak base drive changes actual LED current instead of just adding warnings', () => {
-    const c = { ...DEFAULT_CONFIG, topology: 'npn-low' };
+    const c = transitionConfig(DEFAULT_CONFIG, 'npn-low');
     const strong = solvePoint(c), weak = solvePoint({ ...c, baseResistance: 1e6 });
     assert.ok(weak.current < strong.current / 3);
 });
 test('GPIO state and floating bases are distinguished', () => {
     assert.equal(solvePoint({ ...DEFAULT_CONFIG, state: 'HI_Z' }).current, 0); // digital TR has internal R2
-    assert.equal(analyzePoint({ ...DEFAULT_CONFIG, topology: 'npn-follower', state: 'HI_Z' }).error.code, 'unsupported');
-    assert.equal(solvePoint({ ...DEFAULT_CONFIG, topology: 'nmos-low', state: 'HI_Z' }).current, 0); // external gate pull
-    assert.ok(solvePoint({ ...DEFAULT_CONFIG, topology: 'npn-follower', state: 'HI_Z', pull: 'up' }).current > 0);
+    assert.equal(analyzePoint({ ...transitionConfig(DEFAULT_CONFIG, 'npn-follower'), state: 'HI_Z' }).error.code, 'unsupported');
+    assert.equal(solvePoint({ ...transitionConfig(DEFAULT_CONFIG, 'nmos-low'), state: 'HI_Z' }).current, 0); // external gate pull
+    assert.ok(solvePoint({ ...transitionConfig(DEFAULT_CONFIG, 'npn-follower'), state: 'HI_Z', pull: 'up' }).current > 0);
     assert.equal(solvePoint({ ...DEFAULT_CONFIG, gpioMode: 'open-drain' }).current, 0);
 });
 test('different-domain direct high-side OFF and unpowered GPIO are not false passes', () => {
     for (const topology of ['pnp-high', 'pmos-high', 'gpio-sink'])
-        assert.equal(analyzePoint({ ...DEFAULT_CONFIG, topology, state: 'HIGH' }).error.code, 'unsupported');
+        assert.equal(analyzePoint({ ...transitionConfig(DEFAULT_CONFIG, topology), state: 'HIGH' }).error.code, 'unsupported');
     assert.equal(analyzePoint({ ...DEFAULT_CONFIG, vdd: 0 }).error.code, 'unsupported');
 });
 test('absolute current rating is detected, never used as a current clamp', () => {
@@ -121,12 +121,12 @@ test('OFF device voltage limits still apply and DTC provenance is retained', () 
     assert.ok(r.validation.checks.some(c => c.id.includes('voltage') && c.status === 'exceeded'));
 });
 test('high-side MOS gate stress is detected without silently clamping VGS', () => {
-    const r = analyzePoint({ ...DEFAULT_CONFIG, topology: 'nmos-pmos', vcc: 24 });
+    const r = analyzePoint({ ...transitionConfig(DEFAULT_CONFIG, 'nmos-pmos'), vcc: 24 });
     assert.ok(r.ok && Math.abs(r.point.gateVoltage) > 20);
     assert.ok(r.validation.checks.some(c => c.id.includes('VGS') && c.status === 'exceeded'));
 });
 test('auxiliary resistor dissipation and total GPIO current are checked', () => {
-    const r = analyzePoint({ ...DEFAULT_CONFIG, topology: 'npn-low', baseResistance: 100, otherSourceCurrent: .079 });
+    const r = analyzePoint({ ...transitionConfig(DEFAULT_CONFIG, 'npn-low'), baseResistance: 100, otherSourceCurrent: .079 });
     assert.ok(r.ok);
     assert.ok(r.validation.checks.some(c => c.id === 'GPIO total source' && c.status === 'exceeded'));
     assert.ok(r.validation.checks.some(c => c.id === 'RB power budget'));
@@ -136,7 +136,7 @@ test('digital internal-resistor corners do not double-count input current', () =
         for (const dtcRatio of [8, 10, 12]) {
             const r = solvePoint({ ...DEFAULT_CONFIG, dtcR1Scale, dtcRatio });
             near(r.inputPower, r.dissipatedPower, 1e-6);
-            const R2 = r.ledger.find(p => p.id === 'R2 internal');
+            const R2 = r.ledger.find(p => p.id === 'Q1.R2');
             near(r.externalInputCurrent, r.baseCurrent + R2.current, 1e-9);
         }
 });
@@ -172,7 +172,7 @@ test('temperature outside a reference derating graph produces unknown thermal ch
     const r = analyzePoint({...DEFAULT_CONFIG, ambient: 100});
     assert.ok(r.ok);
     assert.ok(r.validation.checks.some(c => c.id === 'LED derated current' && c.status === 'unknown'));
-    assert.ok(r.validation.checks.some(c => c.id.includes('package power') && c.status === 'unknown'));
+    assert.ok(r.validation.checks.some(c => c.id === 'Q1 power budget' && c.status === 'unknown'));
 });
 
 test('inactive hidden numeric drafts do not block another topology, and transition preserves the draft', () => {
