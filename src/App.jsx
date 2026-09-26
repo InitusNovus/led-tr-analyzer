@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowLeft, Download, ExternalLink, RotateCcw, Zap } from 'lucide-react';
-import { DEFAULT_CONFIG, TOPOLOGIES } from './core/topologies.js';
+import { DEFAULT_CONFIG, TOPOLOGIES, transitionConfig } from './core/topologies.js';
 import { analyzePoint, analyzeCorners, selectResistance } from './core/analysis.js';
 import { LEDS, SOURCES, BJTS, DIGITAL, MOSFETS, GPIO, PACKAGE_PRESETS } from './data/catalog.js';
 import CircuitDiagram from './components/CircuitDiagram.jsx';
@@ -68,7 +68,7 @@ export default function App() {
           <section className="panel"><h2>회로와 부품</h2>
             <label className="field" htmlFor="topology"><span>토폴로지</span><select id="topology" value={config.topology} onChange={e => {
             const next = TOPOLOGIES.find(t => t.id === e.target.value);
-            setConfig(c => ({ ...c, topology: next.id, state: next.active === 'LOW' ? 'LOW' : 'HIGH' }));
+            setConfig(c => transitionConfig(c, next.id));
         }}>{TOPOLOGIES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
             <p className="subtle">{t.active === 'always' ? '항상 연결된 기준 회로' : `${t.active}로 켜지는 구성 · 반대 상태/Hi-Z도 검사하세요.`}</p>
             <label className="field" htmlFor="led"><span>LED</span><select id="led" value={config.led} onChange={e => { set('led', e.target.value); if (!Number.isFinite(LEDS[e.target.value].optical?.nominalMcd) || !LEDS[e.target.value].optical?.relative)

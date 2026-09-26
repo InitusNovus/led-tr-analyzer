@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCES, LEDS, BJTS, DIGITAL, MOSFETS, GPIO } from '../src/data/catalog.js';
+import { SOURCES, LEDS, BJTS, DIGITAL, MOSFETS, GPIO, BJT_MODELS, MOSFET_MODELS, modelsForFamily } from '../src/data/catalog.js';
 import { context, sample, ledVoltage, luminousIntensity, gpioVoltage, bjtAt, digitalAt, mosCurrent } from '../src/core/devices.js';
 import { DEFAULT_CONFIG } from '../src/core/topologies.js';
 const near = (a, b, t = 1e-8) => assert.ok(Math.abs(a - b) < t, `${a} != ${b}`);
@@ -117,4 +117,18 @@ test('LED low-current tail remains nonlinear and is explicitly outside the curve
     const i = luminousIntensity('APT2012SURCK', .01, 40, opticalCtx);
     assert.ok(i > 0 && i < 115);
     assert.ok(opticalCtx.flags.has('approximation:optical-temperature-separable'));
+});
+
+test('model registry exposes independently sourced selectable NPN/NMOS alternatives', () => {
+    assert.ok(BJT_MODELS['nexperia:BC847B']);
+    assert.ok(MOSFET_MODELS['nexperia:BSS138BKW']);
+    assert.ok(modelsForFamily('npn').length>=2);
+    assert.ok(modelsForFamily('nmos').length>=2);
+    assert.equal(BJT_MODELS['nexperia:BC847B'].source,'npnBc847');
+    assert.equal(MOSFET_MODELS['nexperia:BSS138BKW'].source,'nmosBss138');
+});
+test('optical inverse missing relative curve fails as typed unsupported rather than TypeError', async () => {
+    const { selectResistance } = await import('../src/core/analysis.js');
+    for(const led of ['KT-0805Y','KT-0805W'])
+        assert.throws(()=>selectResistance({...DEFAULT_CONFIG,led},.005,{targetMcd:10}),e=>e?.code==='unsupported');
 });
