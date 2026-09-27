@@ -11,8 +11,10 @@ export const SOURCES = {
     kentoW: { manufacturer: 'Shenzhen/Hubei KENTO', revision: 'A3 / 2017-05-16 · C34499-associated sheet', url: 'https://datasheet.lcsc.com/lcsc/2305091500_Hubei-KENTO-Elec-KT-0805W_C34499.pdf' },
     dtc: { manufacturer: 'ROHM', revision: 'Rev.002 / 2016-03-25', url: 'https://fscdn.rohm.com/en/products/databook/datasheet/discrete/transistor/digital/dtc043zebtl-e.pdf' },
     npn: { manufacturer: 'onsemi', revision: 'Rev.14 / 2021-08', url: 'https://www.onsemi.com/download/data-sheet/pdf/mmbt3904lt1-d.pdf' },
+    npnBc847: { manufacturer: 'Nexperia', revision: 'Rev.13 / 2022-07-01', url: 'https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf' },
     pnp: { manufacturer: 'Nexperia', revision: 'Rev.9 / 2022-07-01', url: 'https://assets.nexperia.com/documents/data-sheet/BC856_BC857_BC858.pdf' },
     nmos: { manufacturer: 'Nexperia', revision: 'Rev.7 / 2011-09-08', url: 'https://assets.nexperia.com/documents/data-sheet/2N7002.pdf' },
+    nmosBss138: { manufacturer: 'Nexperia', revision: 'Rev.1 / 2011-08-12', url: 'https://assets.nexperia.com/documents/data-sheet/BSS138BKW.pdf' },
     pmos: { manufacturer: 'NXP / Nexperia', revision: 'Rev.06 / 2008-12-16', url: 'https://assets.nexperia.com/documents/data-sheet/BSS84.pdf' },
     gpio: { manufacturer: 'STMicroelectronics', revision: 'DS13560 Rev.6', url: 'https://www.st.com/resource/en/datasheet/stm32g0b1cc.pdf' },
 };
@@ -190,4 +192,78 @@ export const GPIO = {
     limits: { current: .015, totalSource: .08, totalSink: .08 },
     notes: ['Table57 bounds joined into a scenario curve; not the typical output impedance.', 'No injection/back-power/unpowered-pin model; VDD=0 is unsupported.', 'Aggregate budget includes only explicitly supplied other-pin currents; VDD/VSS package current is not fully checked.'],
 };
+
+/* Stable device model IDs. Family names describe electrical compatibility; modelId selects exact evidence/model. */
+BJTS.npn.modelId = 'onsemi:MMBT3904LT1G';
+BJTS.npn.family = 'npn';
+BJTS.npn.modelKind = 'datasheet-curve';
+BJTS.pnp.modelId = 'nexperia:BC857B';
+BJTS.pnp.family = 'pnp';
+BJTS.pnp.modelKind = 'datasheet-curve';
+DIGITAL.modelId = 'rohm:DTC043ZEB';
+DIGITAL.family = 'digital-npn';
+DIGITAL.modelKind = 'datasheet-terminal-curve';
+MOSFETS.nmos.modelId = 'nexperia:2N7002';
+MOSFETS.nmos.family = 'nmos';
+MOSFETS.nmos.modelKind = 'datasheet-output-curve';
+MOSFETS.pmos.modelId = 'nexperia:BSS84';
+MOSFETS.pmos.family = 'pmos';
+MOSFETS.pmos.modelKind = 'datasheet-output-curve';
+GPIO.modelId = 'st:STM32G0B1-general';
+GPIO.family = 'gpio';
+GPIO.modelKind = 'limit-derived-approximation';
+
+const BC847B = {
+    id: 'BC847B', modelId: 'nexperia:BC847B', name: 'BC847B · Nexperia', source: 'npnBc847', polarity: 'npn', family: 'npn',
+    modelKind: 'datasheet-curve', ratio: 20,
+    gain: graph('npnBc847', 'Fig.6', 'VCE=5V, Tamb=25°C; BC847B typical; coarse manual reading', mA([[.1,250],[.3,275],[1,300],[3,305],[10,290],[30,265],[100,190]])),
+    vbe: graph('npnBc847', 'Fig.7', 'VCE=5V, Tamb=25°C; typical; coarse manual reading', mA([[.01,.50],[.1,.57],[1,.635],[10,.705],[30,.75],[100,.81]])),
+    vceSat: graph('npnBc847', 'Fig.8', 'IC/IB=20, Tamb=25°C; typical; coarse manual reading', mA([[.1,.035],[1,.04],[3,.045],[10,.055],[30,.075],[100,.18]])),
+    vbeSat: graph('npnBc847', 'Fig.9', 'IC/IB=10, Tamb=25°C; typical; coarse manual reading used only as VBE bridge anchor', mA([[.1,.59],[1,.655],[3,.69],[10,.735],[30,.79],[100,.87]])),
+    limits: { current: .1, voltage: 45, reverseBE: 5, power: .25, maxJunction: 150, deratePerC: .002 },
+    thermalCondition: 'FR4 reference mounting in Nexperia BC847x datasheet; not the user PCB',
+    notes: ['Independent NPN model added to exercise real part selection.', 'Fig.8 uses IC/IB=20 while Fig.9 uses IC/IB=10; the reduced active/saturation bridge records that mismatch as a model approximation.'],
+};
+const BSS138BKW = {
+    id: 'BSS138BKW', modelId: 'nexperia:BSS138BKW', name: 'BSS138BKW · Nexperia', source: 'nmosBss138', polarity: 'nmos', family: 'nmos',
+    modelKind: 'datasheet-output-curve',
+    output: [
+        { gate: 1.25, points: [[0,0],[.25,.012],[.5,.015],[1,.017],[2,.018],[4,.019]] },
+        { gate: 1.5, points: [[0,0],[.25,.035],[.5,.047],[1,.052],[2,.057],[4,.061]] },
+        { gate: 1.75, points: [[0,0],[.25,.055],[.5,.105],[1,.145],[2,.17],[4,.19]] },
+        { gate: 2.0, points: [[0,0],[.25,.09],[.5,.16],[1,.24],[2,.32],[4,.38]] },
+        { gate: 2.5, points: [[0,0],[.1,.09],[.25,.22],[.45,.38]] },
+        { gate: 10, points: [[0,0],[.1,.10],[.25,.25],[.4,.40]] },
+    ],
+    transfer: graph('nmosBss138', 'Fig.7', 'VDS=5V, Tj=25°C; typical sub-threshold curve; coarse manual reading, positive log-Y range only', [[.65,1e-6],[.80,1e-5],[.94,1e-4],[1.08,1e-3]], false, true),
+    figure: 'Fig.6 output characteristics, Tj=25°C; coarse manual readings',
+    limits: { current: .32, voltage: 60, gate: 20, power: .26, maxJunction: 150 },
+    thermalCondition: 'Ptot=260mW at Tamb=25°C under the datasheet reference mounting condition; not the user PCB',
+    notes: ['Output points are coarse manual readings of Fig.6; they are typical, not guaranteed corners.', 'Table 7 gives RDS(on) typ/max of 1/1.6Ω @10V, 1.1/2.2Ω @4.5V, and 1.4/6.5Ω @2.5V under their stated currents.'],
+};
+
+export const BJT_MODELS = {
+    [BJTS.npn.modelId]: BJTS.npn,
+    [BC847B.modelId]: BC847B,
+    [BJTS.pnp.modelId]: BJTS.pnp,
+};
+export const DIGITAL_MODELS = { [DIGITAL.modelId]: DIGITAL };
+export const MOSFET_MODELS = {
+    [MOSFETS.nmos.modelId]: MOSFETS.nmos,
+    [BSS138BKW.modelId]: BSS138BKW,
+    [MOSFETS.pmos.modelId]: MOSFETS.pmos,
+};
+export const GPIO_MODELS = { [GPIO.modelId]: GPIO };
+export const DEVICE_MODELS = { ...BJT_MODELS, ...DIGITAL_MODELS, ...MOSFET_MODELS, ...GPIO_MODELS };
+export const DEFAULT_MODEL_BY_FAMILY = Object.freeze({
+    npn: BJTS.npn.modelId,
+    pnp: BJTS.pnp.modelId,
+    'digital-npn': DIGITAL.modelId,
+    nmos: MOSFETS.nmos.modelId,
+    pmos: MOSFETS.pmos.modelId,
+    gpio: GPIO.modelId,
+});
+export function getDeviceModel(modelId) { return DEVICE_MODELS[modelId] ?? null; }
+export function modelsForFamily(family) { return Object.values(DEVICE_MODELS).filter(p => p.family === family); }
+
 export const PACKAGE_PRESETS = { '0402': .0625, '0603': .1, '0805': .125, '1206': .25 };
