@@ -63,7 +63,8 @@ function ResV({ id, x, y, value, label = id, selected, onSelect }) {
 
 function ResH({ id, x1, x2, y, value, label = id, selected, onSelect }) {
     const mid = (x1 + x2) / 2;
-    const width = Math.min(72, Math.max(42, (x2 - x1) * 0.35));
+    const span = Math.abs(x2 - x1);
+    const width = Math.min(72, Math.max(24, span * 0.45), Math.max(12, span - 8));
     return (
         <Hit id={id} selected={selected} onSelect={onSelect} label={label}>
             <path className="symbol" d={`M${x1} ${y}H${mid - width / 2}M${mid + width / 2} ${y}H${x2}`} />
@@ -245,7 +246,8 @@ function TopologyBody({ config, point, selected, onSelect }) {
                         driver={
                             <g>
                                 <DigitalNpn x={470} y={292} name={modelName('Q1')} {...common} />
-                                <Wire d="M470 340V379" on={loadOn} />
+                                <Wire d="M470 238V240H482" on={loadOn} />
+                                <Wire d="M482 344H470V379" on={loadOn} />
                                 <Ground />
                             </g>
                         }
@@ -261,6 +263,7 @@ function TopologyBody({ config, point, selected, onSelect }) {
                         driver={
                             <g>
                                 <Bjt id="Q1" x={470} y={292} name={modelName('Q1')} polarity="npn" {...common} />
+                                <Wire d="M470 238V250" on={loadOn} />
                                 <Wire d="M470 334V379" on={loadOn} />
                                 <Ground />
                             </g>
@@ -269,13 +272,14 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <Gpio x={75} y={292} label={modelName('GPIO1')} state={stateText} {...common} />
                     <Wire d="M120 292H155" on={driveOn} />
                     <ResH id="RB" x1={155} x2={405} y={292} value={config.baseResistance} {...common} />
+                    <Wire d="M405 292H422" on={driveOn} />
                 </g>
             );
         case 'npn-follower':
             return (
                 <g>
                     <Rail />
-                    <Wire d="M470 45V55" on={loadOn} />
+                    <Wire d="M470 45V58" on={loadOn} />
                     <Bjt id="Q1" x={470} y={100} name={modelName('Q1')} polarity="npn" {...common} />
                     <Wire d="M470 142V155" on={loadOn} />
                     <ResV id="RLED" x={470} y={185} value={resistance} {...common} />
@@ -286,6 +290,7 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <Gpio x={75} y={100} label={modelName('GPIO1')} state={stateText} {...common} />
                     <Wire d="M120 100H155" on={driveOn} />
                     <ResH id="RB" x1={155} x2={405} y={100} value={config.baseResistance} {...common} />
+                    <Wire d="M405 100H422" on={driveOn} />
                 </g>
             );
         case 'npn-current-sink':
@@ -294,6 +299,7 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <CommonLoad config={config} point={point} led={led} {...common}
                         driver={<Bjt id="Q1" x={470} y={270} name={modelName('Q1')} polarity="npn" {...common} />}
                     />
+                    <Wire d="M470 228V238" on={loadOn} />
                     <Wire d="M470 312V318" on={loadOn} />
                     <ResV id="RE" x={470} y={344} value={config.emitterResistance} {...common} />
                     <Wire d="M470 384V386" />
@@ -301,6 +307,7 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <Gpio x={75} y={270} label={modelName('GPIO1')} state={stateText} {...common} />
                     <Wire d="M120 270H155" on={driveOn} />
                     <ResH id="RB" x1={155} x2={405} y={270} value={config.baseResistance} {...common} />
+                    <Wire d="M405 270H422" on={driveOn} />
                 </g>
             );
         case 'nmos-low':
@@ -310,6 +317,7 @@ function TopologyBody({ config, point, selected, onSelect }) {
                         driver={
                             <g>
                                 <Mos id="Q1" x={470} y={292} name={modelName('Q1')} polarity="nmos" {...common} />
+                                <Wire d="M470 238V250H474" on={loadOn} />
                                 <Wire d="M474 334V379" on={loadOn} />
                                 <Ground x={474} />
                             </g>
@@ -318,6 +326,7 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <Gpio x={75} y={292} label={modelName('GPIO1')} state={stateText} {...common} />
                     <Wire d="M120 292H145" on={driveOn} />
                     <ResH id="RG" x1={145} x2={405} y={292} value={config.gateResistance} {...common} />
+                    <Wire d="M405 292H422" on={driveOn} />
                     <ResV id="RGS" x={375} y={348} value={config.gatePull} label="RGS" {...common} />
                     <Wire d="M375 292V308M375 388H474" on={driveOn} />
                 </g>
@@ -328,9 +337,11 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <CommonLoad config={config} point={point} led={led} highSide {...common}
                         driver={<Bjt id="Q1" x={470} y={95} name={modelName('Q1')} polarity="pnp" {...common} />}
                     />
+                    <Wire d="M470 45V53" on={loadOn} />
                     <Gpio x={75} y={95} label={modelName('GPIO1')} state={stateText} {...common} />
                     <Wire d="M120 95H155" on={driveOn} />
                     <ResH id="RB" x1={155} x2={405} y={95} value={config.baseResistance} {...common} />
+                    <Wire d="M405 95H422" on={driveOn} />
                 </g>
             );
         case 'pmos-high':
@@ -339,9 +350,12 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <CommonLoad config={config} point={point} led={led} highSide {...common}
                         driver={<Mos id="Q1" x={470} y={95} name={modelName('Q1')} polarity="pmos" {...common} />}
                     />
+                    <Wire d="M470 45V53H474" on={loadOn} />
+                    <Wire d="M474 137H470" on={loadOn} />
                     <Gpio x={75} y={95} label={modelName('GPIO1')} state={stateText} {...common} />
                     <Wire d="M120 95H145" on={driveOn} />
                     <ResH id="RG" x1={145} x2={405} y={95} value={config.gateResistance} {...common} />
+                    <Wire d="M405 95H422" on={driveOn} />
                     <ResV id="RGS" x={375} y={58} value={config.gatePull} label="RGS" {...common} />
                     <Wire d="M375 18H470V28M375 98V95" on={driveOn} />
                 </g>
@@ -372,6 +386,8 @@ function Compound({ config, point, led, outputFamily, inputFamily, selected, onS
                 ? <Bjt id="Q2" x={520} y={92} name={modelName('Q2')} polarity="pnp" {...common} />
                 : <Mos id="Q2" x={520} y={92} name={modelName('Q2')} polarity="pmos" {...common} />
             }
+            <Wire d={outputFamily === 'pnp' ? "M520 45V50" : "M520 45V50H524"} on={loadOn} />
+            {outputFamily === 'pmos' ? <Wire d="M524 134H520" on={loadOn} /> : null}
             <Wire d="M520 134V148" on={loadOn} />
             <ResV id="RLED" x={520} y={178} value={resistance} {...common} />
             <Wire d="M520 218V235" on={loadOn} />
@@ -383,7 +399,7 @@ function Compound({ config, point, led, outputFamily, inputFamily, selected, onS
                 ? <Bjt id="Q1" x={245} y={292} name={modelName('Q1')} polarity="npn" {...common} />
                 : <Mos id="Q1" x={245} y={292} name={modelName('Q1')} polarity="nmos" {...common} />
             }
-            <Wire d="M249 334V379" />
+            <Wire d={inputFamily === 'npn' ? "M245 334V379" : "M249 334V379"} />
             <Ground x={249} />
             <Gpio x={70} y={292} label={modelName('GPIO1')} state={stateText} {...common} />
             <Wire d="M115 292H130" on={driveOn} />
@@ -396,9 +412,9 @@ function Compound({ config, point, led, outputFamily, inputFamily, selected, onS
                 {...common}
             />
             <Wire d="M180 292H197" on={driveOn} />
-            <Wire d="M249 250V130H415" on={driveOn} />
+            <Wire d={inputFamily === 'npn' ? "M245 250V130H415" : "M249 250V130H415"} on={driveOn} />
             <ResH id="Rdrive" x1={415} x2={455} y={130} value={config.gateResistance} label="Rdrive" {...common} />
-            <Wire d="M455 130H465V92" on={driveOn} />
+            <Wire d="M455 130H472V92" on={driveOn} />
             <ResV
                 id={outputFamily === 'pnp' ? 'RBE' : 'RGS_OUT'}
                 x={430}
@@ -407,7 +423,8 @@ function Compound({ config, point, led, outputFamily, inputFamily, selected, onS
                 label={outputFamily === 'pnp' ? 'RBE' : 'RGS(out)'}
                 {...common}
             />
-            <Wire d="M430 22H520M430 102V130" on={driveOn} />
+            <Wire d="M430 22H520V28M430 102V92H472" on={driveOn} />
+            <circle className="junction" cx="472" cy="92" r="3" />
             {inputFamily === 'nmos' ? (
                 <g>
                     <ResV id="RGS_IN" x={185} y={345} value={config.gatePull} label="RGS(in)" {...common} />
