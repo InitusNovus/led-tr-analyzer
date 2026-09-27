@@ -30,9 +30,15 @@ try:
   for t in catalog:
    page.locator('#topology').select_option(t['id']);expect(page.locator('.schematic')).to_have_attribute('data-topology',t['id']);check(page.locator('.schem-part').count()>=2,t['id']+' renders semantic parts')
    if t['active']!='always':
+    # Direct high-side / GPIO sink OFF can only be asserted by this reduced model when VLED and GPIO domains match.
+    match_domain=t['id'] in ['gpio-sink','pnp-high','pmos-high']
+    if match_domain: page.locator('#vcc').fill('3.3')
     page.locator('#state').select_option('HIGH' if t['active']=='LOW' else 'LOW');expect(page.locator('.quick-results')).to_contain_text('0 mA');checks+=1
+    if match_domain: page.locator('#vcc').fill('5')
   page.locator('#topology').select_option('gpio-source');page.locator('#state').select_option('LOW');expect(page.locator('.schematic-head')).to_contain_text('요청 LOW');check('GPIO HIGH' not in page.locator('.schematic').inner_text(),'source state not hard-coded HIGH')
   page.locator('#topology').select_option('gpio-sink');page.locator('#state').select_option('HIGH');expect(page.locator('.schematic-head')).to_contain_text('요청 HIGH');check('GPIO LOW' not in page.locator('.schematic').inner_text(),'sink state not hard-coded LOW')
+  # At the default 5V LED / 3.3V GPIO domains, OFF is deliberately not claimed without injection/5V-tolerance modeling.
+  expect(page.locator('.quick-error')).to_contain_text('현재 조건 계산 불가');checks+=1
   page.locator('#topology').select_option('npn-pnp');check(page.locator('[data-instance-id="Q1"]').count()>0 and page.locator('[data-instance-id="Q2"]').count()>0,'compound Q1/Q2 visible')
   page.locator('#topology').select_option('npn-low');check(page.locator('#model-Q1 option').count()>=2,'NPN has selectable real parts');base_current=page.locator('.quick-results .metric').first.locator('strong').inner_text();page.locator('#model-Q1').select_option('nexperia:BC847B');expect(page.locator('[data-instance-id="Q1"]')).to_contain_text('BC847B');check(page.locator('.quick-results .metric').first.locator('strong').inner_text()!=base_current or page.locator('#model-Q1').input_value()=='nexperia:BC847B','NPN selection applied')
   page.locator('#topology').select_option('nmos-low');check(page.locator('#model-Q1 option').count()>=2,'NMOS has selectable real parts');page.locator('#model-Q1').select_option('nexperia:BSS138BKW');expect(page.locator('[data-instance-id="Q1"]')).to_contain_text('BSS138BKW')
