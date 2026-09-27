@@ -132,3 +132,14 @@ test('optical inverse missing relative curve fails as typed unsupported rather t
     for(const led of ['KT-0805Y','KT-0805W'])
         assert.throws(()=>selectResistance({...DEFAULT_CONFIG,led},.005,{targetMcd:10}),e=>e?.code==='unsupported');
 });
+
+test('BSS138BKW sub-threshold log curve contains only positive anchors and remains callable below first output slice', () => {
+    const p = MOSFET_MODELS['nexperia:BSS138BKW'];
+    assert.ok(p.transfer.logY);
+    assert.ok(p.transfer.points.every(([v, i]) => v > 0 && i > 0));
+    const ctx = context();
+    const i = mosCurrent('nexperia:BSS138BKW', 1, 1.0, 25, ctx);
+    assert.ok(Number.isFinite(i) && i >= 0);
+    assert.ok(ctx.flags.has('approximation:BSS138BKW-weak-gate-shape'));
+    assert.equal(mosCurrent('nexperia:BSS138BKW', 1, 0, 25, context()), 0);
+});
