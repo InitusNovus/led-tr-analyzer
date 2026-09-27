@@ -143,3 +143,9 @@ test('BSS138BKW sub-threshold log curve contains only positive anchors and remai
     assert.ok(ctx.flags.has('approximation:BSS138BKW-weak-gate-shape'));
     assert.equal(mosCurrent('nexperia:BSS138BKW', 1, 0, 25, context()), 0);
 });
+
+test('BSS138BKW provenance points to the actual Table 7 characteristics section',()=>{
+ const p=MOSFET_MODELS['nexperia:BSS138BKW'];
+ assert.ok(p.notes.some(x=>x.includes('Table 7 gives RDS(on)')));
+ assert.equal(SOURCES[p.source].revision,'Rev.1 / 2011-08-12');
+});

@@ -57,6 +57,7 @@ try:
   page.get_by_role('button',name='검증 모드에 적용').count()
   page.screenshot(path=str(OUT/'desktop.png'),full_page=True)
   page.set_viewport_size({'width':390,'height':844});load();expect(page.locator('.schematic')).to_be_visible();check(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'no page horizontal overflow');check(page.locator('.schematic-scroll').evaluate('(e)=>e.scrollWidth>=e.clientWidth'),'schematic can use local 2D scroll')
+  expect(page.locator('#topology-mobile')).to_be_visible();page.locator('#topology-mobile').select_option('gpio-source');expect(page.locator('.schematic')).to_have_attribute('data-topology','gpio-source');checks+=1
   mobile_box=page.locator('.schematic').bounding_box();check(mobile_box is not None and mobile_box['y']<844,'schematic access begins within first mobile viewport: '+str(mobile_box))
   page.screenshot(path=str(OUT/'mobile.png'),full_page=True)
   # SVG screen-space font size: viewBox units scaled by CTM. Small labels target >=12 CSS px.

@@ -31,3 +31,10 @@ test('all required model slots resolve to compatible exact model IDs',()=>{
 test('NPN and NMOS families expose real alternatives',()=>{
  assert.ok(modelsForFamily('npn').length>=2);assert.ok(modelsForFamily('nmos').length>=2);
 });
+
+test('schema-v1 style config without deviceModels migrates to the historical fixed family defaults',()=>{
+ const legacy={...DEFAULT_CONFIG,topology:'npn-low'};delete legacy.deviceModels;
+ const c=normalizeConfig(legacy);
+ assert.equal(c.deviceModels.Q1,'onsemi:MMBT3904LT1G');
+ assert.equal(c.deviceModels.GPIO1,'st:STM32G0B1-general');
+});
