@@ -74,6 +74,9 @@ export default function App(){
     <div className="device-slots">{t.deviceSlots.map(slot=><PartPicker key={slot.id} slot={slot} modelId={config.deviceModels?.[slot.id]??slot.defaultModelId} onChange={setDevice} onInspect={setSelectedInstance}/>)}</div>
    </div>
    <div className="panel schematic-panel">
+    <div className="mobile-circuit-toolbar">
+      <label className="field" htmlFor="topology-mobile"><span>회로 빠른 선택</span><select id="topology-mobile" value={config.topology} onChange={e=>changeTopology(e.target.value)}>{TOPOLOGIES.map(x=><option key={x.id} value={x.id}>{x.family} · {x.name}</option>)}</select></label>
+    </div>
     <CircuitDiagram config={config} point={p} selectedInstance={activeSelected} onSelectInstance={setSelectedInstance}/>
     <div className="quick-results">{p?<><Metric label="LED 전류" value={show(p.current,1000,'mA')} hint={p.region}/><Metric label="LED Vf / 개" value={show(p.ledVf,1,'V')}/>{topologyUsesGPIO(t)&&<Metric label="GPIO 전류" value={show(p.gpioCurrent,1000,'mA')} hint="+ source / − sink"/>}<Metric label="Driver 손실" value={show(p.driverPower,1000,'mW')}/></>:<div className="quick-error"><strong>현재 조건 계산 불가</strong><span>{result.error?.message}</span></div>}</div>
     <Inspector view={selectedView}/>
