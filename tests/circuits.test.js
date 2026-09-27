@@ -212,3 +212,14 @@ test('device family mismatch is explicit and compound transitions preserve compa
     assert.equal(compound.deviceModels.Q1,'nexperia:BC847B');
     assert.equal(compound.deviceModels.Q2,'nexperia:BC857B');
 });
+
+test('BSS138BKW low-gate topology does not fail with invalid log curve', () => {
+    const c = transitionConfig(DEFAULT_CONFIG, 'nmos-low');
+    const r = analyzePoint({
+        ...c,
+        vdd: 2.7,
+        deviceModels: { Q1: 'nexperia:BSS138BKW', GPIO1: 'st:STM32G0B1-general' }
+    });
+    assert.ok(r.ok || ['no-bracket','nonconvergence','inconsistent-point','unsupported'].includes(r.error?.code), JSON.stringify(r));
+    assert.notEqual(r.error?.code, 'invalid-curve');
+});
