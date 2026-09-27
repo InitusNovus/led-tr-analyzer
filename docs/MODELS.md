@@ -15,7 +15,7 @@
 | APT2012SURCK | [Kingbright V.21A, 2025-03-17](https://www.kingbrightusa.com/images/catalog/SPEC/APT2012SURCK.pdf), p.1~3 | If–Vf, 상대 광도–If/T, 전류 디레이팅 |
 | MMBT3904LT1G | [onsemi Rev.14, 2021-08](https://www.onsemi.com/download/data-sheet/pdf/mmbt3904lt1-d.pdf), Fig.15/17/18/19 | gain, VCEsat, VBEsat, 활성영역 VBE |
 | BC847B | [Nexperia BC847x series Rev.13, 2022-07-01](https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf), Fig.6~9 | 선택 가능한 두 번째 NPN; gain/VBE/VCEsat/VBEsat 전형곡선 |
-| BSS138BKW | [Nexperia Rev.1, 2011-08-12](https://assets.nexperia.com/documents/data-sheet/BSS138BKW.pdf), Fig.6/7 및 Table8 | 선택 가능한 두 번째 NMOS; VGS별 output curve와 저게이트 근사 |
+| BSS138BKW | [Nexperia Rev.1, 2011-08-12](https://assets.nexperia.com/documents/data-sheet/BSS138BKW.pdf), Fig.6/7 및 Table7 | 선택 가능한 두 번째 NMOS; VGS별 output curve와 저게이트 근사 |
 | BC857B | [Nexperia Rev.9, 2022-07-01](https://assets.nexperia.com/documents/data-sheet/BC856_BC857_BC858.pdf), Fig.6~9, Table6/7 | B gain group, PNP 특성은 절댓값 사용 |
 | DTC043ZEB | [ROHM Rev.002, 2016-03-25](https://fscdn.rohm.com/en/products/databook/datasheet/discrete/transistor/digital/dtc043zebtl-e.pdf), R1/비율 표, Fig.4/5 | GI=IO/II 및 IO/II=10의 VO(on) 곡선 |
 | 2N7002 | [Nexperia Rev.7, 2011-09-08](https://assets.nexperia.com/documents/data-sheet/2N7002.pdf), Fig.5/7, 정격/열 표 | VGS별 출력 곡선, 낮은 게이트 구동 근사 |
