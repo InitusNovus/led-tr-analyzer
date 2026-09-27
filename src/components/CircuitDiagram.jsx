@@ -128,15 +128,24 @@ function Mos({ id, x, y, polarity = 'nmos', name = '', selected, onSelect }) {
 function DigitalNpn({ id = 'Q1', x, y, name, selected, onSelect }) {
     return (
         <Hit id={id} selected={selected} onSelect={onSelect} label={name}>
-            <rect className="device-ring digital-package" x={x - 52} y={y - 48} width="104" height="96" rx="9" />
-            <path className="symbol" d={`M${x} ${y - 48}V${y - 18}M${x} ${y + 18}V${y + 48}M${x - 52} ${y}H${x - 34}M${x - 22} ${y - 18}V${y + 18}M${x - 22} ${y - 12}L${x} ${y - 22}M${x - 22} ${y + 12}L${x} ${y + 22}`} />
-            <rect className="mini-resistor" x={x - 34} y={y - 6} width="12" height="12" />
-            <path className="symbol" d={`M${x - 22} ${y + 18}H${x - 10}V${y + 34}H${x}`} />
-            <text className="terminal-label" x={x + 7} y={y - 34}>C</text>
-            <text className="terminal-label" x={x + 7} y={y + 43}>E</text>
-            <text className="terminal-label" x={x - 48} y={y - 10}>IN</text>
-            <text className="part-label" x={x + 64} y={y - 8}>{id} · {name}</text>
-            <text className="minor-label" x={x + 64} y={y + 11}>내장 R1 / R2</text>
+            <rect className="device-ring digital-package" x={x - 62} y={y - 52} width="124" height="104" rx="9" />
+            <path className="symbol" d={`M${x - 62} ${y}H${x - 46}M${x - 24} ${y}H${x - 10}`} />
+            <rect className="mini-resistor" x={x - 46} y={y - 7} width="22" height="14" rx="2" />
+            <text className="terminal-label" x={x - 38} y={y - 13}>R1</text>
+
+            <path className="symbol" d={`M${x - 10} ${y - 21}V${y + 21}M${x - 10} ${y - 12}L${x + 12} ${y - 24}L${x + 12} ${y - 52}M${x - 10} ${y + 12}L${x + 12} ${y + 24}L${x + 12} ${y + 52}`} />
+            <path className="arrow" d={`M${x + 10} ${y + 24}l-9 -1l5 -8Z`} />
+
+            <path className="symbol" d={`M${x - 10} ${y + 16}H${x - 32}V${y + 24}`} />
+            <rect className="mini-resistor" x={x - 39} y={y + 24} width="14" height="20" rx="2" />
+            <path className="symbol" d={`M${x - 32} ${y + 44}V${y + 48}H${x + 12}`} />
+            <text className="terminal-label" x={x - 58} y={y + 40}>R2</text>
+
+            <text className="terminal-label" x={x + 19} y={y - 35}>C</text>
+            <text className="terminal-label" x={x + 19} y={y + 45}>E</text>
+            <text className="terminal-label" x={x - 58} y={y - 10}>IN</text>
+            <text className="part-label" x={x + 76} y={y - 7}>{id} · {name}</text>
+            <text className="minor-label" x={x + 76} y={y + 14}>digital NPN · R1/R2 내장</text>
         </Hit>
     );
 }
