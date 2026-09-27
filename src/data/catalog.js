@@ -235,7 +235,7 @@ const BSS138BKW = {
         { gate: 2.5, points: [[0,0],[.1,.09],[.25,.22],[.45,.38]] },
         { gate: 10, points: [[0,0],[.1,.10],[.25,.25],[.4,.40]] },
     ],
-    transfer: graph('nmosBss138', 'Fig.7', 'VDS=5V, Tj=25°C; sub-threshold typical used only below the first output-curve gate slice', [[0,0],[.8,1e-8],[1.0,1e-6],[1.2,1e-5],[1.4,1e-4],[1.6,1e-3]], false, true),
+    transfer: graph('nmosBss138', 'Fig.7', 'VDS=5V, Tj=25°C; typical sub-threshold curve; coarse manual reading, positive log-Y range only', [[.65,1e-6],[.80,1e-5],[.94,1e-4],[1.08,1e-3]], false, true),
     figure: 'Fig.6 output characteristics, Tj=25°C; coarse manual readings',
     limits: { current: .32, voltage: 60, gate: 20, power: .26, maxJunction: 150 },
     thermalCondition: 'Ptot=260mW at Tamb=25°C under the datasheet reference mounting condition; not the user PCB',
