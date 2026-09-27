@@ -239,7 +239,7 @@ const BSS138BKW = {
     figure: 'Fig.6 output characteristics, Tj=25°C; coarse manual readings',
     limits: { current: .32, voltage: 60, gate: 20, power: .26, maxJunction: 150 },
     thermalCondition: 'Ptot=260mW at Tamb=25°C under the datasheet reference mounting condition; not the user PCB',
-    notes: ['Output points are coarse manual readings of Fig.6; they are typical, not guaranteed corners.', 'Table 8 gives RDS(on) typ/max of 1/1.6Ω @10V, 1.1/2.2Ω @4.5V, and 1.4/6.5Ω @2.5V under their stated currents.'],
+    notes: ['Output points are coarse manual readings of Fig.6; they are typical, not guaranteed corners.', 'Table 7 gives RDS(on) typ/max of 1/1.6Ω @10V, 1.1/2.2Ω @4.5V, and 1.4/6.5Ω @2.5V under their stated currents.'],
 };
 
 export const BJT_MODELS = {
