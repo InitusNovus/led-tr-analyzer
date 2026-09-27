@@ -14,6 +14,8 @@
 |---|---|---|
 | APT2012SURCK | [Kingbright V.21A, 2025-03-17](https://www.kingbrightusa.com/images/catalog/SPEC/APT2012SURCK.pdf), p.1~3 | If–Vf, 상대 광도–If/T, 전류 디레이팅 |
 | MMBT3904LT1G | [onsemi Rev.14, 2021-08](https://www.onsemi.com/download/data-sheet/pdf/mmbt3904lt1-d.pdf), Fig.15/17/18/19 | gain, VCEsat, VBEsat, 활성영역 VBE |
+| BC847B | [Nexperia BC847x series Rev.13, 2022-07-01](https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf), Fig.6~9 | 선택 가능한 두 번째 NPN; gain/VBE/VCEsat/VBEsat 전형곡선 |
+| BSS138BKW | [Nexperia Rev.1, 2011-08-12](https://assets.nexperia.com/documents/data-sheet/BSS138BKW.pdf), Fig.6/7 및 Table8 | 선택 가능한 두 번째 NMOS; VGS별 output curve와 저게이트 근사 |
 | BC857B | [Nexperia Rev.9, 2022-07-01](https://assets.nexperia.com/documents/data-sheet/BC856_BC857_BC858.pdf), Fig.6~9, Table6/7 | B gain group, PNP 특성은 절댓값 사용 |
 | DTC043ZEB | [ROHM Rev.002, 2016-03-25](https://fscdn.rohm.com/en/products/databook/datasheet/discrete/transistor/digital/dtc043zebtl-e.pdf), R1/비율 표, Fig.4/5 | GI=IO/II 및 IO/II=10의 VO(on) 곡선 |
 | 2N7002 | [Nexperia Rev.7, 2011-09-08](https://assets.nexperia.com/documents/data-sheet/2N7002.pdf), Fig.5/7, 정격/열 표 | VGS별 출력 곡선, 낮은 게이트 구동 근사 |
@@ -42,6 +44,21 @@ White C34499는 웹의 다른 mirror에 같은 제품명/비슷한 revision을 �
 
 R/G/B/YG/Y/O의 데이터시트 광도는 min/max bin 범위이고 단일 typ 절대광도가 아닙니다. 상대 광도 곡선은 보관하더라도 그 범위를 임의의 midpoint “typ mcd”로 바꾸지 않으며, 현재 UI의 scalar mcd 출력은 `null`입니다. 추후 bin 선택/범위 출력 UI를 별도 구현할 수 있습니다.
 
+## 실제 부품 model ID와 회로 슬롯
+
+토폴로지 ID는 **회로 구조**, instance ID는 그 회로 안의 **역할**, model ID는 실제 특성을 제공하는 **부품 모델**을 뜻합니다. 예를 들어 NPN→PMOS는 `Q1` 입력 NPN, `Q2` 출력 PMOS, `GPIO1`, `LED1`을 별도로 갖습니다.
+
+- NPN: `onsemi:MMBT3904LT1G`, `nexperia:BC847B`
+- PNP: `nexperia:BC857B`
+- digital NPN: `rohm:DTC043ZEB`
+- NMOS: `nexperia:2N7002`, `nexperia:BSS138BKW`
+- PMOS: `nexperia:BSS84`
+- GPIO: `st:STM32G0B1-general`
+
+family에 후보가 한 개뿐이어도 실제 model ID를 감추지 않습니다. 다른 family의 model ID는 입력 오류이며, 조용히 기본 부품으로 fallback하지 않습니다. 구버전 config처럼 `deviceModels`가 없는 입력은 PR #7 시점의 고정 family mapping으로 해석합니다.
+
+회로 전환 시 같은 family의 선택은 가능한 한 보존하고, 새 역할에 호환되는 모델이 없으면 해당 family의 고정 default를 명시적으로 사용합니다. 이 mapping은 계산, 한계 검사, 감도 분석 및 schemaVersion 2 export의 model snapshot에 같이 들어갑니다.
+
 ## 수학 모델의 구현 선택
 
 ### LED와 광학
@@ -54,7 +71,7 @@ APT2012SURCK의 −1.9mV/°C는 20mA에서의 값입니다. 전체 곡선에 적
 
 공개된 활성영역 gain/VBE와 특정 IC/IB 비율의 VCEsat/VBEsat를 연결합니다. 포화 기준점과 활성영역 사이에서 유효 gain을 로그 보간하는 **명시적 bridge**를 사용합니다. 더 강한 베이스 구동 구간의 연장도 근사입니다. 이것은 출력 곡선 전체를 독립적으로 측정해 만든 surface가 아닙니다.
 
-입력 구동과 부하를 함께 풀기 때문에 구동 부족이 실제 LED 전류·VCE·발열을 바꿉니다. IC, IB, IE를 분리하고 에미터 팔로워의 LED 전류는 IE=IC+IB로 계산합니다. 활성영역 데이터의 VCE 조건에서 멀어진 효과와 온도 의존성을 모두 재현하지는 않습니다. 25°C 밖의 BJT 계산은 온도 미모델링을 표시합니다.
+입력 구동과 부하를 함께 풀기 때문에 구동 부족이 실제 LED 전류·VCE·발열을 바꿉니다. IC, IB, IE를 분리하고 에미터 팔로워의 LED 전류는 IE=IC+IB로 계산합니다. 활성영역 데이터의 VCE 조건에서 멀어진 효과와 온도 의존성을 모두 재현하지는 않습니다. 25°C 밖의 BJT 계산은 온도 미모델링을 표시합니다. BC847B의 VCEsat 곡선(Fig.8)은 IC/IB=20, VBEsat 곡선(Fig.9)은 IC/IB=10이므로 두 곡선을 bridge anchor로 함께 쓰는 경우 그 조건 불일치를 별도 approximation flag로 남깁니다.
 
 ### 디지털 TR
 
@@ -72,7 +89,7 @@ DTC043ZEB의 Fig.4 GI는 **외부 IO/II**입니다. 내부 IC/IB로 대입하지
 
 출력 곡선의 VDS축과 VGS 곡선 사이를 보간합니다. 가장 낮은 VGS보다 약한 구동에서는 전달 곡선으로 출력 곡선의 크기를 조정한 **shape approximation**을 사용합니다. VGS(th)로 스위치를 ON/OFF하거나 정격 ID에서 전류를 자르지 않습니다.
 
-Body diode, 역방향 동작, Miller/게이트 전하, 자가발열/SOA, 실제 누설은 해석하지 않습니다. 25°C 밖의 전기 특성은 온도 미모델링 경고가 붙습니다. 2N7002의 Tsp 기준 0.83W를 ambient 정격으로 사용하지 않고 자료의 RthJA 기준 열 예산을 별도로 계산합니다.
+Body diode, 역방향 동작, Miller/게이트 전하, 자가발열/SOA, 실제 누설은 해석하지 않습니다. BSS138BKW 또한 제조사 Fig.6/7의 거친 수동 판독점에 기반하며 Table8의 RDS(on) 조건을 별도 근거로 보존합니다. 25°C 밖의 전기 특성은 온도 미모델링 경고가 붙습니다. 2N7002의 Tsp 기준 0.83W를 ambient 정격으로 사용하지 않고 자료의 RthJA 기준 열 예산을 별도로 계산합니다.
 
 ## 토폴로지와 수렴
 
