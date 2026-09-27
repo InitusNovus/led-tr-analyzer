@@ -2,7 +2,7 @@
 import json,os,shutil,signal,subprocess,time,urllib.request
 from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
-ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'test-results';OUT.mkdir(exist_ok=True)
+ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'test-results';OUT.mkdir(exist_ok=True);ATLAS=OUT/'topologies';ATLAS.mkdir(exist_ok=True)
 URL='http://127.0.0.1:4173/led-tr-analyzer/';INLINE=os.environ.get('BROWSER_INLINE')=='1';server=None if INLINE else subprocess.Popen(['npm','run','preview','--','--host','127.0.0.1','--port','4173','--strictPort'],cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT,start_new_session=True)
 errors=[];checks=0
 def check(c,m):
@@ -29,6 +29,7 @@ try:
   load();expect(page.get_by_role('heading',name='LED-TR Analyzer',exact=True)).to_be_visible();expect(page.locator('.schematic')).to_be_visible();check(page.locator('#topology option').count()==len(catalog),'all topology choices')
   for t in catalog:
    page.locator('#topology').select_option(t['id']);expect(page.locator('.schematic')).to_have_attribute('data-topology',t['id']);check(page.locator('.schem-part').count()>=2,t['id']+' renders semantic parts')
+   page.locator('.schematic').screenshot(path=str(ATLAS/(t['id']+'.png')))
    if t['active']!='always':
     # Direct high-side / GPIO sink OFF can only be asserted by this reduced model when VLED and GPIO domains match.
     match_domain=t['id'] in ['gpio-sink','pnp-high','pmos-high']
@@ -41,13 +42,23 @@ try:
   expect(page.locator('.quick-error')).to_contain_text('현재 조건 계산 불가');checks+=1
   page.locator('#topology').select_option('npn-pnp');check(page.locator('[data-instance-id="Q1"]').count()>0 and page.locator('[data-instance-id="Q2"]').count()>0,'compound Q1/Q2 visible')
   page.locator('#topology').select_option('npn-low');check(page.locator('#model-Q1 option').count()>=2,'NPN has selectable real parts');base_current=page.locator('.quick-results .metric').first.locator('strong').inner_text();page.locator('#model-Q1').select_option('nexperia:BC847B');expect(page.locator('.schematic [data-instance-id="Q1"]')).to_contain_text('BC847B');check(page.locator('.quick-results .metric').first.locator('strong').inner_text()!=base_current or page.locator('#model-Q1').input_value()=='nexperia:BC847B','NPN selection applied')
+  # Interactive schematic is usable without hover.
+  rled=page.locator('.schematic [data-instance-id="RLED"]');rled.focus();rled.press('Enter');check('selected' in (rled.get_attribute('class') or ''),'keyboard selects schematic instance')
+  # Export must preserve the exact applied model ID rather than only a family/source label.
+  with page.expect_download() as download_info:
+   page.get_by_role('button',name='결과 JSON',exact=True).click()
+  report=json.loads(Path(download_info.value.path()).read_text())
+  q1=next(x for x in report['modelSnapshot'] if x['instanceId']=='Q1')
+  check(report['schemaVersion']==2 and q1['modelId']=='nexperia:BC847B','export preserves exact selected Q1 model')
   page.locator('#topology').select_option('nmos-low');check(page.locator('#model-Q1 option').count()>=2,'NMOS has selectable real parts');page.locator('#model-Q1').select_option('nexperia:BSS138BKW');expect(page.locator('.schematic [data-instance-id="Q1"]')).to_contain_text('BSS138BKW')
   page.locator('#led').select_option('KT-0805R');page.locator('#temperature').fill('50');expect(page.locator('.schematic')).to_be_visible();check(page.get_by_text('화면을 표시하지 못했습니다').count()==0,'KT temperature does not trigger ErrorBoundary');page.locator('#temperature').fill('25')
   page.locator('#topology').select_option('npn-low');page.locator('#baseResistance').fill('');page.locator('#topology').select_option('resistor');expect(page.get_by_role('heading',name='동작점',exact=True)).to_be_visible();checks+=1
   page.get_by_role('button',name='전체 초기화',exact=True).click();page.get_by_role('button',name='목표에서 저항 선정',exact=True).click();page.locator('#series').select_option('E96');page.locator('#strategy').select_option('bright');page.get_by_role('button',name='전체 초기화',exact=True).click();page.get_by_role('button',name='목표에서 저항 선정',exact=True).click();check(page.locator('#series').input_value()=='E24+E96' and page.locator('#strategy').input_value()=='closest','full reset resets sizing options')
   page.get_by_role('button',name='검증 모드에 적용').count()
   page.screenshot(path=str(OUT/'desktop.png'),full_page=True)
-  page.set_viewport_size({'width':390,'height':844});load();expect(page.locator('.schematic')).to_be_visible();check(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'no page horizontal overflow');check(page.locator('.schematic-scroll').evaluate('(e)=>e.scrollWidth>=e.clientWidth'),'schematic can use local 2D scroll');page.screenshot(path=str(OUT/'mobile.png'),full_page=True)
+  page.set_viewport_size({'width':390,'height':844});load();expect(page.locator('.schematic')).to_be_visible();check(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'no page horizontal overflow');check(page.locator('.schematic-scroll').evaluate('(e)=>e.scrollWidth>=e.clientWidth'),'schematic can use local 2D scroll')
+  mobile_box=page.locator('.schematic').bounding_box();check(mobile_box is not None and mobile_box['y']<844,'schematic access begins within first mobile viewport: '+str(mobile_box))
+  page.screenshot(path=str(OUT/'mobile.png'),full_page=True)
   # SVG screen-space font size: viewBox units scaled by CTM. Small labels target >=12 CSS px.
   min_px=page.locator('.schematic svg').evaluate("""svg=>{const m=svg.getScreenCTM();const s=Math.abs(m.a);return Math.min(...[...svg.querySelectorAll('text')].map(t=>(parseFloat(getComputedStyle(t).fontSize)||12)*s))}""")
   check(min_px>=11.5,'schematic text remains readable: '+str(min_px))
