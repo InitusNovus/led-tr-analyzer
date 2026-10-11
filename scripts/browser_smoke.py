@@ -49,13 +49,57 @@ try:
    page.get_by_role('button',name='결과 JSON',exact=True).click()
   report=json.loads(Path(download_info.value.path()).read_text())
   q1=next(x for x in report['modelSnapshot'] if x['instanceId']=='Q1')
-  check(report['schemaVersion']==2 and q1['modelId']=='nexperia:BC847B','export preserves exact selected Q1 model')
+  check(report['schemaVersion']==3 and q1['modelId']=='nexperia:BC847B' and report['optical'] is not None,'export preserves exact selected Q1 model')
   page.locator('#topology').select_option('nmos-low');check(page.locator('#model-Q1 option').count()>=2,'NMOS has selectable real parts');page.locator('#model-Q1').select_option('nexperia:BSS138BKW');expect(page.locator('.schematic [data-instance-id="Q1"]')).to_contain_text('BSS138BKW')
   page.locator('#led').select_option('KT-0805R');page.locator('#temperature').fill('50');expect(page.locator('.schematic')).to_be_visible();check(page.get_by_text('화면을 표시하지 못했습니다').count()==0,'KT temperature does not trigger ErrorBoundary');page.locator('#temperature').fill('25')
   page.locator('#topology').select_option('npn-low');page.locator('#baseResistance').fill('');page.locator('#topology').select_option('resistor');expect(page.get_by_role('heading',name='동작점',exact=True)).to_be_visible();checks+=1
   page.get_by_role('button',name='전체 초기화',exact=True).click();page.get_by_role('button',name='목표에서 저항 선정',exact=True).click();page.locator('#series').select_option('E96');page.locator('#strategy').select_option('bright');page.get_by_role('button',name='전체 초기화',exact=True).click();page.get_by_role('button',name='목표에서 저항 선정',exact=True).click();check(page.locator('#series').input_value()=='E24+E96' and page.locator('#strategy').input_value()=='closest','full reset resets sizing options')
   apply_button=page.get_by_role('button',name='검증 모드에 적용',exact=True);expect(apply_button).to_be_visible();apply_button.click();expect(page.locator('#resistance')).to_be_visible();checks+=1
   page.get_by_role('button',name='현재 조건 분석',exact=True).click();expect(page.locator('.corner-results')).to_be_visible();checks+=1
+  # Independent mA / mcd target drafts and KT optical inverse.
+  page.get_by_role('button',name='전체 초기화',exact=True).click()
+  page.get_by_role('button',name='목표에서 저항 선정',exact=True).click()
+  page.locator('#targetMa').fill('12')
+  page.locator('#led').select_option('KT-0805R')
+  page.locator('#target-kind').select_option('mcd')
+  page.locator('#targetMcd').fill('20')
+  expect(page.locator('#optical-basis')).to_have_value('min')
+  page.locator('#target-kind').select_option('current')
+  check(page.locator('#targetMa').input_value()=='12','mA goal draft preserved')
+  page.locator('#target-kind').select_option('mcd')
+  check(page.locator('#targetMcd').input_value()=='20','mcd goal draft preserved')
+  expect(page.locator('.design-goal')).to_be_visible();checks+=1
+  page.locator('#led').select_option('KT-0805W')
+  check(page.locator('#target-kind').input_value()=='current' and page.locator('#targetMa').input_value()=='12','unsupported optical fallback keeps original mA target')
+  expect(page.get_by_text('이전 mcd 입력값은 보존했습니다.')).to_be_visible()
+  page.locator('#led').select_option('KT-0805R')
+  page.locator('#target-kind').select_option('mcd')
+  check(page.locator('#targetMcd').input_value()=='20','mcd draft survives unsupported LED')
+  page.get_by_role('button',name='저항으로 검증',exact=True).click()
+  for field,value in [('resistorRating','0.125'),('auxRating','0.1'),('derating','0.7'),('ambient','25')]:
+   page.locator('#'+field).fill('')
+   expect(page.locator('#'+field)).to_be_visible()
+   expect(page.locator('.quick-error')).to_be_visible()
+   page.locator('#'+field).fill(value)
+   expect(page.get_by_role('heading',name='동작점',exact=True)).to_be_visible()
+   checks+=1
+  page.locator('#topology').select_option('nmos-pmos')
+  for instance in ['RGS_IN','RGS_OUT']:
+   page.locator('.schematic [data-instance-id="'+instance+'"]').click()
+   expect(page.locator('.inspector')).to_have_attribute('data-inspector-id',instance)
+   checks+=1
+  page.locator('#topology').select_option('npn-low')
+  page.locator('#model-GPIO1').select_option('assumed:DC-Thevenin')
+  page.locator('#vdd').fill('5')
+  page.locator('#sourceResistance').fill('15')
+  check(page.locator('.quick-error').count()==0,'assumed 5V source supports DC scenario')
+  page.get_by_role('button',name='전체 초기화',exact=True).click()
+  page.locator('#resistance').fill('220')
+  page.locator('#resistorRating').fill('0.0625')
+  page.get_by_role('button',name='현재 조건 분석',exact=True).click()
+  expect(page.locator('.corner-results')).to_be_visible()
+  expect(page.locator('.design-state-grid')).to_contain_text('초과 조건 있음')
+  check(page.locator('.design-warnings .design-alert').count()>0,'sample violation details visible')
   page.screenshot(path=str(OUT/'desktop.png'),full_page=True)
   page.set_viewport_size({'width':390,'height':844});load();expect(page.locator('.schematic')).to_be_visible();check(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'no page horizontal overflow');check(page.locator('.schematic-scroll').evaluate('(e)=>e.scrollWidth>=e.clientWidth'),'schematic can use local 2D scroll')
   expect(page.locator('#topology-mobile')).to_be_visible();page.locator('#topology-mobile').select_option('gpio-source');expect(page.locator('.schematic')).to_have_attribute('data-topology','gpio-source');checks+=1
