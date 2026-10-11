@@ -270,12 +270,12 @@ function pmosBias(c,ctx,kind){
     if(kind==='npn'){
         const qAt=j=>bjtAt(inModel,j,c.vcc-j*total,c.temperature),j=finishRoot(j=>{const q=qAt(j);return gpioVoltage(c,q.base)-q.base*c.baseResistance-q.vbe;},0,c.vcc/total).value;
         const q=bjtAt(inModel,j,c.vcc-j*total,c.temperature,ctx),pin=gpioVoltage(c,q.base,ctx),qp=qPower('Q1',q,inModel);
-        return{gate:j*c.gatePull,current:q.base,pin,ledger:[qp,resistor('RB',q.base,c.baseResistance),resistor('Rdrive',j,c.gateResistance),resistor('RGS',j,c.gatePull)],
+        return{gate:j*c.gatePull,current:q.base,pin,ledger:[qp,resistor('RB',q.base,c.baseResistance),resistor('Rdrive',j,c.gateResistance),resistor('RGS_OUT',j,c.gatePull)],
             sources:[source('VLED bias',j,c.vcc),source('GPIO1',q.base,pin)],semiconductors:[qp]};
     }
     const bias=directNmosBias(c,ctx,inModel),j=finishRoot(j=>mosCurrent(inModel,c.vcc-j*total,bias.gate,c.temperature)-j,0,c.vcc/total,1e-11).value,voltage=c.vcc-j*total;
     mosCurrent(inModel,voltage,bias.gate,c.temperature,ctx);const qp=mosPower('Q1',j,voltage,bias.gate,inModel);
-    return{gate:j*c.gatePull,current:bias.current,pin:bias.pin,ledger:[...bias.ledger,qp,resistor('Rdrive',j,c.gateResistance),resistor('RGS high-side',j,c.gatePull)],
+    return{gate:j*c.gatePull,current:bias.current,pin:bias.pin,ledger:[...bias.ledger.map(x=>x.id==='RGS'?{...x,id:'RGS_IN',instanceId:'RGS_IN'}:x),qp,resistor('Rdrive',j,c.gateResistance),resistor('RGS_OUT',j,c.gatePull)],
         sources:[...bias.sources,source('VLED bias',j,c.vcc)],semiconductors:[qp]};
 }
 function mosStage(c,ctx,highSide,kind='direct'){
