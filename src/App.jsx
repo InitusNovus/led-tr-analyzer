@@ -109,10 +109,10 @@ export default function App(){
     <label className="field" htmlFor="topology"><span>토폴로지</span><select id="topology" value={config.topology} onChange={e=>changeTopology(e.target.value)}>{TOPOLOGIES.map(x=><option key={x.id} value={x.id}>{x.family} · {x.name}</option>)}</select></label>
     <p className="subtle">{t.path}<br/>토폴로지 전환 시 기본 ON 상태({t.active})로 설정됩니다.</p>
     <details className="topology-gallery"><summary>지원 회로 13종 보기</summary><div className="topology-cards">{TOPOLOGIES.map(x=><button key={x.id} className={cls(config.topology===x.id&&'active')} onClick={()=>changeTopology(x.id)}><b>{x.name}</b><small>{x.path}</small></button>)}</div></details>
-    <label className="field" htmlFor="led"><span>LED1</span><select id="led" value={config.led} onChange={e=>{const id=e.target.value;set('led',id);if(!(Number.isFinite(LEDS[id].optical?.nominalMcd)&&LEDS[id].optical?.relative))setTargetKind('current');setSelectedInstance('LED1');}}>{Object.values(LEDS).map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
-    <div className="part-meta"><span>{led.kind}</span><span>{optical.label}</span></div>
-    <div className="supply-grid">{number('vcc','VLED / collector rail','V')}{topologyUsesGPIO(t)&&number('vdd','GPIO 전원','V')}{number('seriesCount','직렬 LED','개',1)}{number('temperature','전기 모델 온도','°C')}</div>
-    <div className="device-slots">{t.deviceSlots.map(slot=><PartPicker key={slot.id} slot={slot} modelId={config.deviceModels?.[slot.id]??slot.defaultModelId} onChange={setDevice} onInspect={setSelectedInstance}/>)}</div>
+    <label className="field" htmlFor="led"><span>LED1</span><select id="led" value={config.led} onChange={e=>changeLed(e.target.value)}>{Object.values(LEDS).map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+    <div className="part-meta"><span>{led.kind}</span><span>{optical.label}</span></div><QuickSpecs part={led} heading="LED 시험조건·광도 범위"/>
+    <div className="supply-grid">{number('vcc','VLED / collector rail','V')}{topologyUsesGPIO(t)&&number('vdd',config.deviceModels?.GPIO1==='assumed:DC-Thevenin'?'제어원 HIGH 전압':'GPIO 전원','V')}{number('seriesCount','직렬 LED','개',1)}{number('temperature','전기 모델 온도','°C')}</div>
+    <div className="device-slots" id="device-slots">{t.deviceSlots.map(slot=><PartPicker key={slot.id} slot={slot} modelId={config.deviceModels?.[slot.id]??slot.defaultModelId} onChange={setDevice} onInspect={setSelectedInstance}/>)}</div>
    </div>
    <div className="panel schematic-panel">
     <div className="mobile-circuit-toolbar">
@@ -132,6 +132,8 @@ export default function App(){
       <label className="field" htmlFor="pull"><span>Hi-Z pull</span><select id="pull" value={config.pull} onChange={e=>set('pull',e.target.value)}><option value="none">없음</option><option value="up">Pull-up</option><option value="down">Pull-down</option></select></label>
       {config.pull!=='none'&&number('pullResistance','GPIO pull','Ω')}
     </div>
+    {config.deviceModels?.GPIO1==='assumed:DC-Thevenin'&&number('sourceResistance','제어원 Rout','Ω')}
+    {config.deviceModels?.GPIO1==='assumed:DC-Thevenin'&&<p className="subtle">사용자 가정 DC 제어원: 실제 전류한계·역급전·보호특성은 미모델링입니다.</p>}
     {t.activeParameters.includes('baseResistance')&&number('baseResistance','RB','Ω')}
     {t.activeParameters.includes('emitterResistance')&&number('emitterResistance','RE','Ω')}
     {t.activeParameters.includes('gateResistance')&&number('gateResistance',t.id==='nmos-pmos'?'RG / Rdrive · 공용':'RG / Rdrive','Ω')}
@@ -141,9 +143,35 @@ export default function App(){
     <section className="panel"><h2>계산 모드</h2><div className="tabs" role="group" aria-label="계산 모드"><button className={mode==='verify'?'active':''} onClick={()=>setMode('verify')}>저항으로 검증</button><button className={mode==='size'?'active':''} disabled={!sizeSupported} title={!sizeSupported?'이 회로는 RE로 전류를 설정합니다.':''} onClick={()=>setMode('size')}>목표에서 저항 선정</button></div>
      {!sizeSupported&&<p className="subtle">이 토폴로지는 RLED 자동 역산 대신 RE를 직접 설정해 검증합니다.</p>}
      {mode==='verify'?<NumberField name="resistance" label="RLED" unit="Ω" value={config.resistance} onChange={v=>set('resistance',v)}/>:<>
-       <div className="fields two"><NumberField name="target" label={targetKind==='mcd'?'목표 광도':'목표 LED 전류'} unit={targetKind==='mcd'?'mcd':'mA'} value={target} onChange={setTarget}/><label className="field" htmlFor="target-kind"><span>목표 단위</span><select id="target-kind" value={targetKind} onChange={e=>setTargetKind(e.target.value)}><option value="current">전류</option><option value="mcd" disabled={!(Number.isFinite(led.optical?.nominalMcd)&&led.optical?.relative)}>광도 · 근사</option></select></label></div>
+       <div className="fields two">
+        {targetKind==='current'?<NumberField name="targetMa" label="목표 LED 전류" unit="mA" value={targetMa} onChange={v=>{setTargetMa(v);setCornerSnapshot(null);}}/>:
+          <NumberField name="targetMcd" label="목표 광도" unit="mcd" value={targetMcd} onChange={v=>{setTargetMcd(v);setCornerSnapshot(null);}}/>}
+        <label className="field" htmlFor="target-kind"><span>목표 단위</span>
+         <select id="target-kind" value={targetKind} onChange={e=>changeTargetKind(e.target.value)}>
+          <option value="current">전류</option><option value="mcd" disabled={!opticalCap.canInvert}>광도 · 근거곡선</option>
+         </select></label>
+       </div>
+       {targetKind==='current'&&<div className="target-explore">
+         <label htmlFor="target-slider">전류 빠른 탐색 · 0.5–25mA (권장/정격 범위가 아님)</label>
+         <input id="target-slider" type="range" min="0.5" max="25" step="0.5"
+           value={typeof targetMa==='number'?Math.max(.5,Math.min(25,targetMa)):10}
+           onChange={e=>{setTargetMa(Number(e.target.value));setCornerSnapshot(null);}}/>
+       </div>}
+       {targetKind==='mcd'&&<><label className="field" htmlFor="optical-basis"><span>광도 역산 기준</span>
+         <select id="optical-basis" value={opticalBasis} onChange={e=>{setOpticalBasis(e.target.value);setCornerSnapshot(null);}}>
+          {opticalCap.hasRange&&<option value="min">최저 bin 기준 추정 (보증 아님)</option>}
+          {opticalCap.hasTypical&&<option value="typ">제조사 typ anchor 기준</option>}
+          {opticalCap.hasRange&&<option value="representative">중간 대표값 가정 (typ 아님)</option>}
+         </select></label>
+         <p className="subtle">광도는 선택 시험점과 전형적 상대곡선 기반 추정입니다. 선정 저항으로 목표 달성을 다시 검사합니다.</p></>}
+       {opticalNotice&&<p role="status" className="model-chip">{opticalNotice}</p>}
+       {!opticalCap.canInvert&&<p className="subtle">이 LED는 광도 역산의 근거가 부족합니다. 전류 목표는 사용할 수 있습니다.</p>}
        <div className="fields two"><label className="field" htmlFor="series"><span>E-series</span><select id="series" value={series} onChange={e=>setSeries(e.target.value)}>{['E24','E96','E24+E96'].map(s=><option key={s}>{s}</option>)}</select></label><label className="field" htmlFor="strategy"><span>표준값 선택</span><select id="strategy" value={strategy} onChange={e=>setStrategy(e.target.value)}><option value="closest">가장 가까운 저항</option><option value="safe">큰 저항</option><option value="bright">작은 저항</option></select></label></div>
-       {result.sizing&&<div className="selection" data-testid="selected-resistance"><span>{show(result.sizing.selected,1,'Ω')}</span><small>연속값 {show(result.sizing.exact,1,'Ω')}</small><button onClick={()=>{set('resistance',result.sizing.selected);setMode('verify');}}>검증 모드에 적용</button></div>}
+       {result.sizing&&<div className="selection" data-testid="selected-resistance">
+  <span>{show(result.sizing.selected,1,'Ω')}</span><small>연속값 {show(result.sizing.exact,1,'Ω')}</small>
+  {result.sizing.goal&&<b className={result.sizing.goal.met?'goal-met':'goal-missed'}>{result.sizing.goal.met?'목표 달성':'현재 선정값 목표 미달'}</b>}
+  <button onClick={()=>{set('resistance',result.sizing.selected);setMode('verify');}}>검증 모드에 적용</button>
+ </div>}
      </>}
     </section>
    </aside>
