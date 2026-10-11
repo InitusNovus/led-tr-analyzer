@@ -95,7 +95,9 @@ test('zero brightness/current sizing fails cleanly, no synthetic 0Ω', () => {
     assert.throws(() => selectResistance(DEFAULT_CONFIG, 0));
     assert.throws(() => selectResistance(DEFAULT_CONFIG, -1));
     assert.throws(() => selectResistance(DEFAULT_CONFIG, .001, { targetMcd: 0 }));
-    assert.throws(() => selectResistance({ ...DEFAULT_CONFIG, led: 'KT-0805R' }, .001, { targetMcd: 20 }));
+    const range = selectResistance({ ...DEFAULT_CONFIG, led: 'KT-0805R' }, .001, { targetMcd: 20 });
+    assert.equal(range.goal.basis, 'min');
+    assert.ok(range.result.ok);
 });
 test('optical target inversion uses the selected LED optical model', () => {
     const r = selectResistance(DEFAULT_CONFIG, .01, { targetMcd: 115 });
