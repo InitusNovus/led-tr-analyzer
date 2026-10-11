@@ -4,7 +4,7 @@ import { LEDS } from '../src/data/catalog.js';
 import { opticalAtCurrent,opticalCapability,opticalValueForBasis,opticalUsageGuide,solveOpticalCurrent } from '../src/core/optics.js';
 import { DEFAULT_CONFIG,transitionConfig } from '../src/core/topologies.js';
 import { selectResistance } from '../src/core/analysis.js';
-const close=(a,b,tol=1e-5)=>assert.ok(Math.abs(a-b)<=tol,`expected \${a} ≈ \${b}`);
+const close=(a,b,tol=1e-5)=>assert.ok(Math.abs(a-b)<=tol,`expected ${a} ≈ ${b}`);
 const kt=['KT-0805R','KT-0805G','KT-0805B','KT-0805YG','KT-0805O'];
 for(const id of kt) {
  test(id+' optical anchor preserves original bin edges and no fake typ',()=>{
@@ -25,8 +25,8 @@ test('G 5mA absolute anchor and 20mA relative normalization differ',()=>{
  assert.equal(at20.nominalMcd,null);
 });
 test('O relative shape peaks then decreases: inverse chooses earliest increasing solution',()=>{
- const max=opticalAtCurrent('KT-0805O',.035).maxMcd;
- assert.ok(max>opticalAtCurrent('KT-0805O',.04).maxMcd);
+ const max=opticalAtCurrent('KT-0805O',.035).minMcd;
+ assert.ok(max>opticalAtCurrent('KT-0805O',.04).minMcd);
  const sol=solveOpticalCurrent('KT-0805O',max*.96,{basis:'min'});
  assert.ok(sol.current<.035);
 });
