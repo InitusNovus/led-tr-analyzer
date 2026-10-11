@@ -1,5 +1,6 @@
 import { ModelError, finite, bisect } from './math.js';
-import { context, ledVoltage, luminousIntensity, gpioVoltage, gpioState, gpioModel, driveHigh, driveLow, bjtAt, digitalAt, mosCurrent } from './devices.js';
+import { context, ledVoltage, gpioVoltage, gpioState, gpioModel, driveHigh, driveLow, bjtAt, digitalAt, mosCurrent } from './devices.js';
+import { opticalAtCurrent } from './optics.js';
 import { LEDS, DEFAULT_MODEL_BY_FAMILY, getDeviceModel } from '../data/catalog.js';
 
 const slot = (id, family, role) => ({ id, family, role, defaultModelId: DEFAULT_MODEL_BY_FAMILY[family] });
@@ -137,7 +138,8 @@ function finalize(r){
     const {config:c,ctx}=r;
     r.ledVf=ledVoltage(c.led,r.current,c.temperature,c.vfShift,ctx);
     r.loadVoltage=r.ledVf*c.seriesCount+r.current*c.resistance;
-    r.luminousMcd=luminousIntensity(c.led,r.current,c.temperature,ctx);
+    r.optical=opticalAtCurrent(c.led,r.current,c.temperature,ctx);
+    r.luminousMcd=r.optical.nominalMcd;
     r.ledger.unshift(resistor('RLED',r.current,c.resistance),{...power('LED1',r.current,r.ledVf*c.seriesCount,'led'),count:c.seriesCount});
     r.resistorPower=r.current*r.current*c.resistance;
     r.driverPower=r.semiconductors.reduce((sum,q)=>sum+q.power,0);

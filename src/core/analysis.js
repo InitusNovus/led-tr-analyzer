@@ -2,6 +2,7 @@ import { ModelError, finite, bisect, standardResistor, unique } from './math.js'
 import { normalizeConfig, solvePoint, topologyById, topologyUsesGPIO } from './topologies.js';
 import { LEDS, getDeviceModel } from '../data/catalog.js';
 import { context, sample } from './devices.js';
+import { solveOpticalCurrent, opticalValueForBasis } from './optics.js';
 export function checkLimits(point) {
     const c=point.config,led=LEDS[c.led],checks=[],t=topologyById(c.topology);
     const add=(id,actual,limit,condition='')=>checks.push({id,actual,limit,condition,status:limit==null?'unknown':actual>limit*(1+1e-8)?'exceeded':'within'});
@@ -64,17 +65,13 @@ export function analyzeCorners(input,{includeDtc=false}={}){
     return{kind:'sampled-sensitivity',count:scenarios.length,validCount:samples.length,failures,extrema,anyExceeded:samples.some(s=>s.validation.status==='limits-exceeded'),
         flags:unique(samples.flatMap(s=>s.point.flags)),note:'Vf offset is user-assumed. Typical device curves are held fixed. Sampled extrema are not guaranteed process/thermal worst cases. RB/RE and auxiliary resistors are nominal; RLED tolerance is swept only.'};
 }
-export function selectResistance(input,targetCurrent,{series='E24+E96',strategy='closest',targetMcd=null}={}){
+export function selectResistance(input,targetCurrent,{series='E24+E96',strategy='closest',targetMcd=null,opticalBasis='min'}={}){
     const c=normalizeConfig(input),t=topologyById(c.topology);let target=targetCurrent;
     if(!t.supportedOperations.includes('size'))throw new ModelError('unsupported','이 토폴로지는 RLED 자동 역산을 지원하지 않습니다.');
+    let opticalGoal=null;
     if(targetMcd!==null){
-        finite(targetMcd,'target mcd',Number.MIN_VALUE,1e6);const p=LEDS[c.led];
-        if(!p.optical||!Number.isFinite(p.optical.nominalMcd)||!p.optical.relative?.domain)
-            throw new ModelError('unsupported','선택한 LED는 단일 광도 anchor와 상대 광도 곡선을 함께 제공하지 않아 광도 역산을 지원하지 않습니다.');
-        const {luminousIntensity}=opticalFunctions,hi=p.optical.relative.domain[1],max=luminousIntensity(c.led,hi,c.temperature);
-        if(!Number.isFinite(max))throw new ModelError('unsupported','현재 온도에서 광도 모델을 계산할 수 없습니다.');
-        if(targetMcd>max)throw new ModelError('out-of-domain','목표 광도가 광학 곡선 범위를 벗어납니다.');
-        target=bisect(i=>luminousIntensity(c.led,i,c.temperature)-targetMcd,0,hi).value;
+        opticalGoal=solveOpticalCurrent(c.led,targetMcd,{basis:opticalBasis,temperature:c.temperature});
+        target=opticalGoal.current;
     }
     finite(target,'target current',1e-9,1);
     const currentAtLog=l=>solvePoint({...c,resistance:10**l}).current,lo=-3,hi=7,min=currentAtLog(hi),max=currentAtLog(lo);
@@ -82,6 +79,13 @@ export function selectResistance(input,targetCurrent,{series='E24+E96',strategy=
     const root=bisect(l=>currentAtLog(l)-target,lo,hi,{fTolerance:Math.max(target*1e-7,1e-12),xTolerance:1e-10});
     if(!root.converged)throw new ModelError('nonconvergence','저항 역산이 수렴하지 않았습니다.');
     const exact=10**root.value,selected=standardResistor(exact,series,strategy),result=analyzePoint({...c,resistance:selected});
-    return{exact,selected,targetCurrent:target,result,note:strategy==='safe'?'큰 저항 선택은 nominal 전류 기준일 뿐 공차/정격 안전을 보증하지 않습니다.':'선정 후 실제 동작점을 다시 계산했습니다.'};
+    const achieved=opticalGoal&&result.ok?opticalValueForBasis(result.point.optical,opticalBasis):null;
+    const goal=opticalGoal?{kind:'optical',basis:opticalBasis,targetMcd,desiredCurrent:target,
+        achievedMcd:achieved,met:Number.isFinite(achieved)&&achieved>=targetMcd*(1-1e-7),
+        validity:opticalGoal.validity,assumptions:opticalGoal.assumptions}
+      :{kind:'current',targetCurrent:target,achievedCurrent:result.ok?result.point.current:null,
+        met:result.ok&&result.point.current>=target*(1-1e-7)};
+    return{exact,selected,targetCurrent:target,result,goal,
+        note:'선택된 표준 저항으로 실제 전류·광도 목표 달성 여부를 다시 계산했습니다. 표본/제조 편차의 보증은 아닙니다.'};
 }
 import * as opticalFunctions from './devices.js';
