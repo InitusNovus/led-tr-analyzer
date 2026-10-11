@@ -5,3 +5,61 @@
 @media(max-width:720px){.workbench,.lower-grid{grid-template-columns:minmax(0,1fr)}.shell{padding:20px 13px}.top-inner{padding:12px 15px}.title-row{align-items:flex-start;flex-direction:column}.actions{width:100%}.actions button{flex:1}.schematic-panel{order:1}.setup-panel{order:2}.mobile-circuit-toolbar{display:block;margin-bottom:10px}.mobile-circuit-toolbar .field{margin:0}.lower-grid{margin-top:16px}.quick-results{grid-template-columns:1fr 1fr}.schematic svg{min-width:480px}.schematic-scroll{border-top:1px solid #284856;border-bottom:1px solid #284856}.metrics{padding:18px;gap:17px 10px}.metric strong{font-size:22px}.fields.two,.supply-grid{grid-template-columns:1fr 1fr}.evidence-grid{grid-template-columns:1fr}input,select{font-size:16px}.topology-cards{grid-template-columns:1fr}.part-label,.rail-label{font-size:19px}.terminal-label,.minor-label{font-size:18px}}
 @media(max-width:380px){.fields.two,.supply-grid,.quick-results{grid-template-columns:1fr}.panel{padding:16px}.schematic-panel{padding:10px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+/* #20/#21 - Optical/engineering summaries. The labels deliberately distinguish assumptions and limits. */
+.quick-specs{background:#f6fafb;border:1px solid #dce7e8;border-radius:8px;margin:10px 0;padding:10px}
+.quick-specs summary{color:#2b6070;list-style:revert;font-weight:650}
+.spec-rows{display:grid;gap:7px;margin:10px 0}
+.spec-row{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;border-bottom:1px solid #e0e9ed;padding:5px 0}
+.spec-row span{font-size:11px;color:#5a707e}
+.spec-row b{font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.spec-row small{grid-column:1/-1;color:#72838b;word-wrap:break-word}
+.quick-specs .subtle{margin:8px 0}
+.quick-specs a{font-size:11px;word-break:break-word}
+.field-error{color:#b83b49!important;font-size:12px!important;margin-top:2px}
+.field input[aria-invalid="true"]{border-color:#d85b65;background:#fff7f8}
+.design-summary{display:flex;flex-direction:column;gap:14px}
+.design-summary h2{margin-bottom:0}
+.design-state-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.design-state-grid>div{display:flex;flex-direction:column;background:#f1f6f7;padding:12px;border-radius:8px}
+.design-state-grid small,.design-secondary,.design-goal small,.design-optical small{font-size:11px;color:#637b86}
+.design-state-grid strong{font-size:13px;color:#254d5b}
+.design-goal{border:1px solid #d3e4e6;background:#f5faf9;border-radius:8px;padding:12px;display:grid;gap:5px}
+.design-goal span{font-variant-numeric:tabular-nums;color:#214d62}
+.design-goal em{font-style:normal;font-weight:650;font-size:12px}
+.design-goal em.goal-missed,.goal-missed{color:#a54730}
+.goal-met{color:#197267}
+.design-optical{border-top:1px solid #e1e9ec;padding-top:12px}
+.design-optical>div{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px}
+.design-optical b{font-size:21px;color:#1b5268}
+.design-optical small{display:block;line-height:1.5;margin-top:4px}
+.design-optical details p{font-size:12px;line-height:1.6;color:#5e717d;margin-top:5px}
+.design-voltage,.design-power{border-top:1px solid #e1e9ec;padding-top:12px}
+.voltage-rail{display:flex;justify-content:space-between;color:#617987;font-size:11px;margin:7px 0}
+.voltage-segments{display:flex;gap:2px;overflow:hidden}
+.voltage-segment{background:#d8e9ec;padding:10px 3px;min-width:48px;display:flex;flex-direction:column;align-items:center;overflow:hidden}
+.voltage-segment:nth-child(2){background:#c7dce4}
+.voltage-segment:nth-child(3){background:#bbd5d8}
+.voltage-segment:nth-child(4){background:#b0cfd5}
+.voltage-segment span{font-size:10px;color:#335664}
+.voltage-segment b{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.design-voltage small{color:#6d828d;font-size:11px;display:block;margin-top:7px}
+.design-power-head,.design-secondary{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.design-power-head span{font-size:13px;font-variant-numeric:tabular-nums}
+.power-meter{margin:9px 0;height:12px;background:#e4ebee;border-radius:30px;overflow:hidden}
+.power-meter span{display:block;background:#548f99;height:100%}
+.design-power .subtle{margin-top:10px;margin-bottom:0}
+.design-warnings{display:grid;gap:8px}
+.design-alert{padding:10px;background:#fff4ef;border-left:3px solid #b46a4a;display:flex;flex-direction:column;align-items:flex-start;gap:4px;font-size:12px}
+.design-alert button{padding:2px;border:0;background:transparent;color:#7b3d2b;text-align:left;font-weight:700}
+.design-alert code{font-size:10px;overflow-wrap:anywhere;color:#566875}
+.design-warnings p{font-size:12px;line-height:1.6;color:#596d78}
+.instance-checks{display:grid;gap:5px;margin-top:10px;border-top:1px solid #e1e8eb;padding-top:10px}
+.instance-checks>div{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:11px}
+.instance-checks small{color:#667e88}
+.target-explore{display:grid;gap:4px;margin:0 0 12px}
+.target-explore label{font-size:11px;color:#647b86}
+.target-explore input{padding:5px}
+.tolerance-presets{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 12px}
+.tolerance-presets button{font-size:11px;padding:5px 8px}
+@media(max-width:720px){.design-summary{padding:16px}.voltage-segment b{font-size:11px}.design-state-grid{gap:6px}.design-optical b{font-size:18px}}
