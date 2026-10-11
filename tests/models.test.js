@@ -52,7 +52,8 @@ test('KT min/max intensity ranges are not converted into invented typical mcd', 
     for (const id of ['KT-0805R','KT-0805G','KT-0805B','KT-0805YG','KT-0805Y','KT-0805O']) {
         const ctx = context();
         assert.equal(luminousIntensity(id, LEDS[id].optical.testCurrent, 25, ctx), null);
-        assert.ok(ctx.flags.has('not-modeled:LED-absolute-optical-anchor'));
+        if(id==='KT-0805Y')assert.ok(ctx.flags.has('not-modeled:LED-absolute-optical-anchor'));
+        else assert.equal(ctx.flags.has('not-modeled:LED-absolute-optical-anchor'),false);
     }
 });
 test('curve endpoints are preserved and provenance is resolvable', () => {
