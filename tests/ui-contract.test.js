@@ -10,7 +10,7 @@ const expected={
  'npn-low':['GPIO1','RB','Q1','RLED','LED1'],'npn-follower':['GPIO1','RB','Q1','RLED','LED1'],
  'npn-current-sink':['GPIO1','RB','Q1','RE','RLED','LED1'],'nmos-low':['GPIO1','RG','RGS','Q1','RLED','LED1'],
  'pnp-high':['GPIO1','RB','Q1','RLED','LED1'],'pmos-high':['GPIO1','RG','RGS','Q1','RLED','LED1'],
- 'npn-pnp':['GPIO1','RB','Q1','Rdrive','RBE','Q2','RLED','LED1'],'npn-pmos':['GPIO1','RB','Q1','Rdrive','RGS','Q2','RLED','LED1'],
+ 'npn-pnp':['GPIO1','RB','Q1','Rdrive','RBE','Q2','RLED','LED1'],'npn-pmos':['GPIO1','RB','Q1','Rdrive','RGS_OUT','Q2','RLED','LED1'],
  'nmos-pmos':['GPIO1','RG','RGS_IN','Q1','Rdrive','RGS_OUT','Q2','RLED','LED1']
 };
 for(const t of TOPOLOGIES)test(t.id+' circuit template has independent expected instances',()=>{
@@ -66,5 +66,17 @@ test('check schemas have canonical component IDs, units and scopes',async()=>{
  for(const check of r.validation.checks){
    assert.ok(check.ruleId && check.instanceId && check.unit && check.scope==='nominal');
    assert.ok(buildInstanceViews(r.point.config,r.point,r.validation).some(x=>x.instanceId===check.instanceId));
+ }
+});
+
+test('every resistor ledger reference maps to the same named topology instance',async()=>{
+ const { analyzePoint }=await import('../src/core/analysis.js');
+ for(const t of TOPOLOGIES) {
+  const cfg=transitionConfig(DEFAULT_CONFIG,t.id),r=analyzePoint(cfg);
+  if(!r.ok)continue;
+  const names=new Set(CIRCUIT_TEMPLATES[t.id].instances);
+  for(const e of r.point.ledger.filter(e=>e.kind==='resistor')) {
+    assert.ok(names.has(e.instanceId),t.id+' unknown resistor instance: '+e.instanceId);
+  }
  }
 });

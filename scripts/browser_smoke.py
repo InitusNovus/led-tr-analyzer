@@ -19,6 +19,7 @@ try:
  else:
   if not INLINE: raise RuntimeError('Preview server did not start')
  catalog=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import {TOPOLOGIES} from './src/core/topologies.js';console.log(JSON.stringify(TOPOLOGIES))"],cwd=ROOT,text=True))
+ contracts=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import {CIRCUIT_TEMPLATES} from './src/ui/circuitTemplates.js';console.log(JSON.stringify(CIRCUIT_TEMPLATES))"],cwd=ROOT,text=True))
  with sync_playwright() as p:
   exe=os.environ.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE') or shutil.which('chromium');browser=p.chromium.launch(headless=True,**({'executable_path':exe} if exe else {}));page=browser.new_page(viewport={'width':1365,'height':1000},device_scale_factor=1)
   page.on('pageerror',lambda e:errors.append(str(e)));page.on('console',lambda m:errors.append(m.text) if m.type=='error' else None)
@@ -29,6 +30,9 @@ try:
   load();expect(page.get_by_role('heading',name='LED-TR Analyzer',exact=True)).to_be_visible();expect(page.locator('.schematic')).to_be_visible();check(page.locator('#topology option').count()==len(catalog),'all topology choices')
   for t in catalog:
    page.locator('#topology').select_option(t['id']);expect(page.locator('.schematic')).to_have_attribute('data-topology',t['id']);check(page.locator('.schem-part').count()>=2,t['id']+' renders semantic parts')
+   rendered=set(page.locator('.schematic [data-instance-id]').evaluate_all('(nodes)=>nodes.map(n=>n.getAttribute("data-instance-id"))'))
+   declared=set(contracts[t['id']]['instances'])
+   check(rendered.issubset(declared),t['id']+' rendered refs outside template: '+str(rendered-declared))
    page.locator('.schematic').screenshot(path=str(ATLAS/(t['id']+'.png')))
    if t['active']!='always':
     # Direct high-side / GPIO sink OFF can only be asserted by this reduced model when VLED and GPIO domains match.

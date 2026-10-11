@@ -198,7 +198,7 @@ function npnLow(c,ctx,digital=false){
     if(digital){
         r.externalInputCurrent=q.input;r.externalRatio=q.externalRatio;
         const die={...power('Q1.die',q.collector,q.voltage,'bjt'),instanceId:'Q1'};die.power+=q.base*q.vbe;
-        r.ledger.push(die,{...resistor('Q1.R1',q.input,q.r1),instanceId:'Q1'},{...resistor('Q1.R2',q.vbe/q.r2,q.r2),instanceId:'Q1'});
+        r.ledger.push(die,resistor('Q1.R1',q.input,q.r1),resistor('Q1.R2',q.vbe/q.r2,q.r2));
         r.semiconductors.push({id:'Q1',instanceId:'Q1',modelId,kind:'digital',current:q.collector,base:q.base,emitter:q.emitter,voltage:q.voltage,inputVoltage:q.inputVoltage,
             power:die.power+q.input*q.input*q.r1+q.vbe*q.vbe/q.r2,region:q.region});
     } else {
