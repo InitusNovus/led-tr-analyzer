@@ -103,6 +103,9 @@ try:
   page.screenshot(path=str(OUT/'desktop.png'),full_page=True)
   page.set_viewport_size({'width':390,'height':844});load();expect(page.locator('.schematic')).to_be_visible();check(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'no page horizontal overflow');check(page.locator('.schematic-scroll').evaluate('(e)=>e.scrollWidth>=e.clientWidth'),'schematic can use local 2D scroll')
   expect(page.locator('#topology-mobile')).to_be_visible();page.locator('#topology-mobile').select_option('gpio-source');expect(page.locator('.schematic')).to_have_attribute('data-topology','gpio-source');checks+=1
+  led_center=page.locator('.schematic [data-instance-id="LED1"]').evaluate('(el)=>{const r=el.getBoundingClientRect();return r.left+r.width/2}')
+  check(led_center>60 and led_center<360,'mobile initially centers essential LED symbol: '+str(led_center))
+  expect(page.locator('.schematic-panel .design-summary')).to_be_visible();checks+=1
   mobile_box=page.locator('.schematic').bounding_box();check(mobile_box is not None and mobile_box['y']<844,'schematic access begins within first mobile viewport: '+str(mobile_box))
   page.screenshot(path=str(OUT/'mobile.png'),full_page=True)
   # SVG screen-space font size: viewBox units scaled by CTM. Small labels target >=12 CSS px.

@@ -121,6 +121,8 @@ export default function App(){
     <CircuitDiagram config={config} point={p} selectedInstance={activeSelected} onSelectInstance={setSelectedInstance}/>
     <div className="quick-results">{p?<><Metric label="LED 전류" value={show(p.current,1000,'mA')} hint={p.region}/><Metric label="LED Vf / 개" value={show(p.ledVf,1,'V')}/>{topologyUsesGPIO(t)&&<Metric label="GPIO 전류" value={show(p.gpioCurrent,1000,'mA')} hint="+ source / − sink"/>}<Metric label="Driver 손실" value={show(p.driverPower,1000,'mW')}/></>:<div className="quick-error"><strong>현재 조건 계산 불가</strong><span>{result.error?.message}</span></div>}</div>
     <Inspector view={selectedView}/>
+    <DesignSummary config={p?.config??config} point={p} validation={result.ok?result.validation:null}
+     corners={corners} mode={mode} goal={result.sizing?.goal??null} onInspect={setSelectedInstance}/>
    </div>
   </section>
 
@@ -192,8 +194,7 @@ export default function App(){
    </aside>
 
    <div className="results-column">
-    <DesignSummary config={p?.config??config} point={p} validation={result.ok?result.validation:null}
-     corners={corners} mode={mode} goal={result.sizing?.goal??null} onInspect={setSelectedInstance}/>
+
     {!result.ok?<section className="notice error" role="alert"><h2>계산할 수 없는 조건</h2><p>{result.error.message}</p><small>{result.error.code}</small></section>:<>
      <section className="panel report" aria-label="동작점 결과" aria-live="polite"><div className="report-head"><h2>동작점</h2><span className={'status '+result.validation.status}>{result.validation.label}</span></div><div className="metrics">
       <Metric label="LED 전류" value={show(p.current,1000,'mA')} hint={p.region+' · DC'}/><Metric label="LED 전압 / 개" value={show(p.ledVf,1,'V')}/>

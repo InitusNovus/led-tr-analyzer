@@ -63,3 +63,7 @@
 .tolerance-presets{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 12px}
 .tolerance-presets button{font-size:11px;padding:5px 8px}
 @media(max-width:720px){.design-summary{padding:16px}.voltage-segment b{font-size:11px}.design-state-grid{gap:6px}.design-optical b{font-size:18px}}
+
+.schematic-panel .design-summary{margin-top:14px;box-shadow:none;border-color:#dbe5e9;background:#fcfefe}
+.schematic-scroll{scrollbar-width:thin}
+@media(max-width:720px){.schematic-panel .design-summary{padding:13px}}

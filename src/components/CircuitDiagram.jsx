@@ -1,4 +1,4 @@
-import React from 'react';
+import React,{useEffect,useRef} from 'react';
 import { LEDS, getDeviceModel } from '../data/catalog.js';
 import { gpioState } from '../core/devices.js';
 import { circuitTemplate } from '../ui/circuitTemplates.js';
@@ -441,6 +441,17 @@ function Compound({ config, point, led, outputFamily, inputFamily, selected, onS
 }
 
 export default function CircuitDiagram({ config, point, selectedInstance, onSelectInstance }) {
+    const scrollRef=useRef(null);
+    useEffect(()=>{
+        const el=scrollRef.current;
+        if(!el)return;
+        if(window.matchMedia('(max-width:720px)').matches){
+            const focusX=['resistor','gpio-source','gpio-sink'].includes(config.topology)?470:
+                config.topology==='npn-pnp'||config.topology==='npn-pmos'||config.topology==='nmos-pmos'?410:395;
+            const expectedLeft=focusX/720*el.scrollWidth-el.clientWidth/2;
+            el.scrollLeft=Math.max(0,Math.min(el.scrollWidth-el.clientWidth,expectedLeft));
+        }else el.scrollLeft=0;
+    },[config.topology]);
     const template = circuitTemplate(config.topology);
     const loadOn = (point?.current ?? 0) > 1e-9;
     const stateText = config.deviceModels?.GPIO1
@@ -457,7 +468,7 @@ export default function CircuitDiagram({ config, point, selectedInstance, onSele
                     {point ? `${(point.current * 1000).toPrecision(4)} mA` : '—'}
                 </span>
             </div>
-            <div className="schematic-scroll">
+            <div className="schematic-scroll" ref={scrollRef}>
                 <svg viewBox="0 0 720 430" role="img" aria-label={`${config.topology} 회로도`}>
                     <TopologyBody config={config} point={point} selected={selectedInstance} onSelect={onSelectInstance} />
                 </svg>
