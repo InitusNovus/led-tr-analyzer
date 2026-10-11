@@ -5,6 +5,9 @@ import{analyzePoint,analyzeCorners,selectResistance}from'./core/analysis.js';
 import{LEDS,SOURCES,PACKAGE_PRESETS,modelsForFamily,getDeviceModel}from'./data/catalog.js';
 import{selectedParts,partEvidence,opticalEvidence,buildInstanceViews}from'./ui/viewModel.js';
 import CircuitDiagram from'./components/CircuitDiagram.jsx';
+import DesignSummary from './components/DesignSummary.jsx';
+import QuickSpecs from './components/QuickSpecs.jsx';
+import { opticalCapability } from './core/optics.js';
 import'./index.css';
 
 const show=(v,scale=1,unit='')=>v==null||!Number.isFinite(v)?'—':(v*scale).toLocaleString('en-US',{maximumSignificantDigits:4})+(unit?' '+unit:'');
@@ -27,7 +30,14 @@ const FLAGS={
 };
 const cls=(...v)=>v.filter(Boolean).join(' ');
 function Flag({value}){return<li>{FLAGS[value]??(value.startsWith('extrapolation:')?'곡선 범위 밖 외삽: '+value.slice(14):value.replace('approximation:','명시적 근사: ').replace('not-modeled:','미모델화: '))}</li>;}
-function NumberField({name,label,value,onChange,unit='',step='any',disabled=false}){return<label className="field" htmlFor={name}><span>{label}<small>{unit}</small></span><input id={name} type="number" step={step} value={value} disabled={disabled} onChange={e=>onChange(e.target.value===''?'':Number(e.target.value))}/></label>;}
+function NumberField({name,label,value,onChange,unit='',step='any',disabled=false}){
+ const blank=value==='';
+ return <label className="field" htmlFor={name}><span>{label}<small>{unit}</small></span>
+  <input id={name} type="number" step={step} value={value} disabled={disabled} aria-invalid={blank}
+   onChange={e=>onChange(e.target.value===''?'':Number(e.target.value))}/>
+  {blank&&<small className="field-error" role="alert">값을 입력하면 이 필드가 다시 계산됩니다.</small>}
+ </label>;
+}
 function Metric({label,value,hint}){return<div className="metric"><span>{label}</span><strong>{value}</strong>{hint&&<small>{hint}</small>}</div>;}
 function PartPicker({slot,modelId,onChange,onInspect}){
  const models=modelsForFamily(slot.family),part=getDeviceModel(modelId),src=part?SOURCES[part.source]:null;
@@ -35,28 +45,59 @@ function PartPicker({slot,modelId,onChange,onInspect}){
    <label className="field compact" htmlFor={'model-'+slot.id}><span>실제 부품</span><select id={'model-'+slot.id} value={modelId} onChange={e=>onChange(slot.id,e.target.value)}>{models.map(m=><option key={m.modelId} value={m.modelId}>{m.name}</option>)}</select></label>
    <div className="part-meta"><span>{part?.modelKind??'model'}</span><span>{models.length===1?'현재 지원 모델 1개':models.length+'개 모델'}</span></div>
    {src&&<small className="source-line">{src.manufacturer} · {src.revision}</small>}
+   <QuickSpecs part={part}/>
  </div>;
 }
 function Inspector({view}){
- if(!view)return<div className="inspector empty">회로의 소자를 선택하면 상세값을 표시합니다.</div>;
- const ev=view.part?partEvidence(view.part):null;
- return<div className="inspector"><div className="inspector-title"><div><strong>{view.instanceId}</strong><span>{view.part?.name??view.label}</span></div>{view.region&&<em>{view.region}</em>}</div>
-   {view.metrics.length?<div className="inspector-metrics">{view.metrics.map((m,i)=><span key={m.label+i}><small>{m.label}</small><b>{m.display}</b></span>)}</div>:<p className="subtle">현재 동작점 수치가 없습니다.</p>}
-   {ev&&<div className="evidence-mini"><span>{ev.modelKind}</span>{ev.capabilities.map(x=><span key={x}>{x}</span>)}</div>}
+ if(!view)return<div className="inspector empty" role="status">선택한 소자에 대한 모델·결과 연결이 없습니다. 다른 소자를 대신 표시하지 않습니다.</div>;
+ return <div className="inspector" data-inspector-id={view.instanceId}>
+  <div className="inspector-title"><div><strong>{view.instanceId}</strong><span>{view.part?.name??view.label}</span></div>{view.region&&<em>{view.region}</em>}</div>
+  {view.metrics.length?<div className="inspector-metrics">{view.metrics.map((m,i)=><span key={m.label+i}><small>{m.label}</small><b>{m.display}</b></span>)}</div>:
+   <p className="subtle">이 소자의 동작점은 아직 계산되지 않았거나 현재 구조에서 수치가 없습니다. 정적 부품 정보는 유지됩니다.</p>}
+  {view.checks?.length>0&&<div className="instance-checks"><strong>이 소자의 정격 검사</strong>{view.checks.map((c,i)=><div key={c.ruleId+i}>
+     <span>{c.id} · {c.status}</span>
+     <small>{show(c.actual,c.unit==='A'||c.unit==='W'?1000:1,c.unit==='A'?'mA':c.unit==='W'?'mW':c.unit)} / {show(c.limit,c.unit==='A'||c.unit==='W'?1000:1,c.unit==='A'?'mA':c.unit==='W'?'mW':c.unit)}</small>
+   </div>)}</div>}
+  {view.evidence&&<div className="evidence-mini"><span>{view.evidence.modelKind}</span>{view.evidence.capabilities.map(x=><span key={x}>{x}</span>)}</div>}
+  {view.part&&<QuickSpecs part={view.part} heading="선택 소자 정적 스펙"/>}
+  {!view.part&&view.parentInstanceId&&<p className="subtle">내장 소자 · 상위 {view.parentInstanceId}</p>}
  </div>;
 }
 export default function App(){
- const[config,setConfig]=useState(()=>freshConfig()),[mode,setMode]=useState('verify'),[target,setTarget]=useState(10),[targetKind,setTargetKind]=useState('current');
+ const[config,setConfig]=useState(()=>freshConfig()),[mode,setMode]=useState('verify');
+ const[targetMa,setTargetMa]=useState(10),[targetMcd,setTargetMcd]=useState(60),
+  [targetKind,setTargetKind]=useState('current'),[opticalBasis,setOpticalBasis]=useState('typ'),
+  [opticalNotice,setOpticalNotice]=useState('');
  const[series,setSeries]=useState('E24+E96'),[strategy,setStrategy]=useState('closest'),[cornerSnapshot,setCornerSnapshot]=useState(null),[includeDtc,setIncludeDtc]=useState(false),[selectedInstance,setSelectedInstance]=useState('Q1');
  const t=topologyById(config.topology),led=LEDS[config.led],optical=opticalEvidence(led);
  const set=(key,value)=>{setCornerSnapshot(null);setConfig(c=>({...c,[key]:value}));};
  const setDevice=(id,value)=>{setCornerSnapshot(null);setSelectedInstance(id);setConfig(c=>({...c,deviceModels:{...(c.deviceModels??{}),[id]:value}}));};
  const changeTopology=id=>{const next=topologyById(id);setCornerSnapshot(null);setConfig(c=>transitionConfig(c,id));if(!next.supportedOperations.includes('size'))setMode('verify');setSelectedInstance(next.deviceSlots.find(s=>s.id==='Q1')?'Q1':'LED1');};
- const result=useMemo(()=>{if(mode==='verify')return analyzePoint(config);try{const sizing=selectResistance(config,targetKind==='current'?Number(target)/1000:.001,{series,strategy,targetMcd:targetKind==='mcd'?Number(target):null});return{...sizing.result,sizing};}catch(e){return{ok:false,error:{code:e.code??'calculation-error',message:e.message}};}},[config,mode,target,targetKind,series,strategy]);
- const p=result.ok?result.point:null,applied=p?.config??null,configKey=JSON.stringify(applied),corners=cornerSnapshot&&p&&cornerSnapshot.key===configKey?cornerSnapshot.result:null;
- const parts=selectedParts(config,t),views=buildInstanceViews(applied??config,p,result.ok?result.validation:null),activeSelected=views.find(v=>v.instanceId===selectedInstance)?.instanceId??(t.deviceSlots.find(s=>s.id==='Q1')?.id??'LED1'),selectedView=views.find(v=>v.instanceId===activeSelected);
- const reset=()=>{setConfig(freshConfig());setMode('verify');setTarget(10);setTargetKind('current');setSeries('E24+E96');setStrategy('closest');setIncludeDtc(false);setCornerSnapshot(null);setSelectedInstance('Q1');};
- const exportResult=()=>{if(!p)return;const modelSnapshot=selectedParts(p.config,t).map(x=>({instanceId:x.instanceId,modelId:x.modelId,source:x.part.source,sourceRevision:SOURCES[x.part.source]?.revision??null,modelKind:x.part.modelKind??x.part.kind??null}));const report={schemaVersion:2,application:'LED-TR Analyzer',scope:'datasheet-based reduced DC model, not SPICE',inputDraft:config,appliedConfiguration:p.config,modelSnapshot,result,corners,migrationNote:'schemaVersion 1 used the fixed model mapping from main fbc118a; schemaVersion 2 stores exact selected model IDs.'};const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='led-tr-analysis-v2.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ const opticalCap=opticalCapability(led);
+ const result=useMemo(()=>{
+   if(mode==='verify')return analyzePoint(config);
+   try{const sizing=selectResistance(config,targetKind==='current'?targetMa/1000:.001,
+     {series,strategy,targetMcd:targetKind==='mcd'?targetMcd:null,opticalBasis});
+     return {...sizing.result,sizing};
+   }catch(e){return{ok:false,error:{code:e.code??'calculation-error',message:e.message}};}
+ },[config,mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy]);
+ const p=result.ok?result.point:null,applied=p?.config??null,configKey=JSON.stringify({applied,mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy,includeDtc}),corners=cornerSnapshot&&p&&cornerSnapshot.key===configKey?cornerSnapshot.result:null;
+ const parts=selectedParts(config,t),views=buildInstanceViews(applied??config,p,result.ok?result.validation:null),activeSelected=selectedInstance,selectedView=views.find(v=>v.instanceId===selectedInstance)??null;
+ const reset=()=>{setConfig(freshConfig());setMode('verify');setTargetMa(10);setTargetMcd(60);setTargetKind('current');
+   setOpticalBasis('typ');setOpticalNotice('');setSeries('E24+E96');setStrategy('closest');setIncludeDtc(false);setCornerSnapshot(null);setSelectedInstance('Q1');};
+ const changeLed=id=>{
+   const cap=opticalCapability(LEDS[id]);set('led',id);setSelectedInstance('LED1');
+   setOpticalBasis(cap.hasRange?'min':'typ');
+   if(targetKind==='mcd'&&!cap.canInvert){
+     setTargetKind('current');
+     setOpticalNotice('선택 LED에 광도 역산 근거가 없어 전류 목표로 돌아왔습니다. 이전 mcd 입력값은 보존했습니다.');
+   }else setOpticalNotice('');
+ };
+ const changeTargetKind=kind=>{
+   if(kind==='mcd'&&!opticalCap.canInvert)return;
+   setCornerSnapshot(null);setTargetKind(kind);setOpticalNotice('');
+ };
+ const exportResult=()=>{if(!p)return;const modelSnapshot=selectedParts(p.config,t).map(x=>({instanceId:x.instanceId,modelId:x.modelId,source:x.part.source,sourceRevision:SOURCES[x.part.source]?.revision??null,modelKind:x.part.modelKind??x.part.kind??null}));const report={schemaVersion:3,application:'LED-TR Analyzer',scope:'datasheet-based reduced DC model, not SPICE',inputDraft:config,designIntent:{mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy},appliedConfiguration:p.config,modelSnapshot,result,corners,optical:p.optical,goal:result.sizing?.goal??null,migrationNote:'v3 structured optical range and independent mA/mcd goals; v2 stored exact model IDs.'};const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='led-tr-analysis-v3.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  const number=(name,label,unit='',step='any')=><NumberField key={name} name={name} label={label} unit={unit} step={step} value={config[name]} onChange={v=>set(name,v)}/>;
  const q1=getDeviceModel(config.deviceModels?.Q1),sizeSupported=t.supportedOperations.includes('size');
  return<>
