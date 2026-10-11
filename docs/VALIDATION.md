@@ -56,3 +56,25 @@ CI는 Node24에서 lockfile을 이용해 설치하고 위 경로를 실행합니
 - #13: 회로 심볼은 B/C/E와 G/D/S, GPIO port, LED A/K, 복합 Q1/Q2 및 주요 bias 저항을 읽을 수 있어야 합니다. 단순 `NPN` 텍스트 박스를 성공으로 보지 않습니다.
 - #14: 회로 선택·부품 선택·소자 inspector·소자별 결과·datasheet 근거를 같은 instance/model snapshot에서 읽을 수 있어야 합니다.
 - #15: 수치 coverage와 별개로 실제 브라우저 조작과 회로 의미 fixture를 통과해야 합니다.
+
+
+## #20/#21 실사용 흐름 회귀 (2026-10)
+
+기존 topology/수치 CI 외에 `tests/optics.test.js`, `tests/ui-contract.test.js`, `scripts/browser_smoke.py`는 다음을 검증합니다.
+
+- KENTO R/G/B/YG/O의 min/max 시험점 복원 및 `nominalMcd=null` 유지
+- 절대 광도 시험전류와 relative 곡선 정규화 구분 (KT-G 5mA→20mA)
+- 광도 상승/비단조 곡선의 유효 범위 내 최초 역산, `out-of-domain` 및 미지원 typed error
+- W 단일 시험점만 지원, Y 시험전류 미확인 유지, 25°C 외 광학 조건에서 가정 표시
+- 선정된 E-series 저항으로 실제 목표 광도 또는 전류를 **재검증**
+- 광도 usage guide는 전기·정격 계산과 독립이며, range에 걸치는 여러 밴드를 표시
+- mA/mcd 목표값 보존, 다른 LED로 바꿔 광도 불가일 때 원래 mA를 유지
+- resistorRating/auxRating/derating/ambient 입력 오류 발생 후 **같은 필드에서 수정 가능**
+- 계산 실패 중에도 정적 instance 유지, Q1.R1/2 및 RGS_IN/OUT canonical 식별
+- `checkLimits`가 ruleId/instanceId/unit/scope를 포함하고 같은 inspector에 연결
+- nominal 통과 + sampled 초과를 같은 설계 요약에서 **범위를 구별해** 표시
+- 별도의 사용자 가정 5V 제어원과 실제 STM32 GPIO 제한을 구분
+- 모바일에서 핵심 회로 소자가 가로 스크롤 초기 위치에 보이는지 확인
+- JSON v3 export에서 exact 부품 model ID, 독립 목표값, structured optical 결과를 확인
+
+**범위:** CI의 sampled grid는 지정한 입력 공차 축을 표본화한 것입니다. 반도체 생산 분포·모든 thermal corner·광학 bin 조합의 보증 worst case가 아닙니다. SVG 스크린샷과 coverage는 테스트 산출물이며 실측/제조승인이 아닙니다.
