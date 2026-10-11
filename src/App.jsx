@@ -159,6 +159,13 @@ export default function App(){
            value={typeof targetMa==='number'?Math.max(.5,Math.min(25,targetMa)):10}
            onChange={e=>{setTargetMa(Number(e.target.value));setCornerSnapshot(null);}}/>
        </div>}
+       {targetKind==='mcd'&&<div className="target-explore">
+         <label htmlFor="optical-slider">광도 탐색용 눈금 · 유효범위는 실제 곡선으로 검사</label>
+         <input id="optical-slider" type="range" min="1" step="1"
+           max={Math.max(20,Math.min(2000,Math.round(1.5*(led.optical?.maxMcd??led.optical?.nominalMcd??200))))}
+           value={typeof targetMcd==='number'?Math.max(1,Math.min(Math.max(20,Math.min(2000,Math.round(1.5*(led.optical?.maxMcd??led.optical?.nominalMcd??200)))),targetMcd)):60}
+           onChange={e=>{setTargetMcd(Number(e.target.value));setCornerSnapshot(null);}}/>
+       </div>}
        {targetKind==='mcd'&&<><label className="field" htmlFor="optical-basis"><span>광도 역산 기준</span>
          <select id="optical-basis" value={opticalBasis} onChange={e=>{setOpticalBasis(e.target.value);setCornerSnapshot(null);}}>
           {opticalCap.hasRange&&<option value="min">최저 bin 기준 추정 (보증 아님)</option>}

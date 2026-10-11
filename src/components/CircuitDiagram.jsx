@@ -74,10 +74,11 @@ function ResH({ id, x1, x2, y, value, label = id, selected, onSelect }) {
     );
 }
 
-function Led({ x, y, color, id = 'LED1', name = '', selected, onSelect, on = false }) {
+function Led({ x, y, color, id = 'LED1', name = '', selected, onSelect, on = false, driveCurrentA = null }) {
+    const cue=on?0.1+0.38*Math.min(1,Math.max(0,(driveCurrentA??0)/.02)):0;
     return (
         <Hit id={id} selected={selected} onSelect={onSelect} label={name || id}>
-            {on ? <circle className="led-glow" cx={x} cy={y} r="31" fill={color} /> : null}
+            {on ? <circle className="led-glow" cx={x} cy={y} r="31" fill={color} opacity={cue} /> : null}
             <path className="symbol led-body" d={`M${x - 18} ${y - 15}H${x + 18}L${x} ${y + 8}Z`} />
             <path className="symbol" d={`M${x - 20} ${y + 10}H${x + 20}`} />
             <path className="symbol emission" d={`M${x + 23} ${y - 12}l18 -15M${x + 28} ${y - 2}l18 -15`} />
@@ -173,7 +174,7 @@ function CommonLoad({ config, point, led, selected, onSelect, x = 470, highSide 
                 <Wire d={`M${x} 137V150`} on={on} />
                 <ResV id="RLED" x={x} y={180} value={resistance} selected={selected} onSelect={onSelect} />
                 <Wire d={`M${x} 220V238`} on={on} />
-                <Led x={x} y={272} color={led.color} name={led.id} on={on} selected={selected} onSelect={onSelect} />
+                <Led x={x} y={272} color={led.color} name={led.id} on={on} driveCurrentA={point?.current} selected={selected} onSelect={onSelect} />
                 <Wire d={`M${x} 306V379`} on={on} />
                 <Ground x={x} />
             </g>
@@ -185,7 +186,7 @@ function CommonLoad({ config, point, led, selected, onSelect, x = 470, highSide 
             <Wire d={`M${x} 45V60`} on={on} />
             <ResV id="RLED" x={x} y={88} value={resistance} selected={selected} onSelect={onSelect} />
             <Wire d={`M${x} 128V145`} on={on} />
-            <Led x={x} y={180} color={led.color} name={led.id} on={on} selected={selected} onSelect={onSelect} />
+            <Led x={x} y={180} color={led.color} name={led.id} on={on} driveCurrentA={point?.current} selected={selected} onSelect={onSelect} />
             <Wire d={`M${x} 214V${driverTop}`} on={on} />
             {driver}
         </g>
@@ -211,7 +212,7 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <Wire d="M470 45V60" on={loadOn} />
                     <ResV id="RLED" x={470} y={90} value={resistance} {...common} />
                     <Wire d="M470 130V150" on={loadOn} />
-                    <Led x={470} y={185} color={led.color} name={led.id} on={loadOn} {...common} />
+                    <Led x={470} y={185} color={led.color} name={led.id} on={loadOn} driveCurrentA={point?.current} {...common} />
                     <Wire d="M470 219V379" on={loadOn} />
                     <Ground />
                 </g>
@@ -223,7 +224,7 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <Wire d="M470 64V70" on={loadOn} />
                     <ResV id="RLED" x={470} y={100} value={resistance} {...common} />
                     <Wire d="M470 140V155" on={loadOn} />
-                    <Led x={470} y={190} color={led.color} name={led.id} on={loadOn} {...common} />
+                    <Led x={470} y={190} color={led.color} name={led.id} on={loadOn} driveCurrentA={point?.current} {...common} />
                     <Wire d="M470 224V379" on={loadOn} />
                     <Ground />
                 </g>
@@ -235,7 +236,7 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <Wire d="M470 45V70" on={loadOn} />
                     <ResV id="RLED" x={470} y={100} value={resistance} {...common} />
                     <Wire d="M470 140V155" on={loadOn} />
-                    <Led x={470} y={190} color={led.color} name={led.id} on={loadOn} {...common} />
+                    <Led x={470} y={190} color={led.color} name={led.id} on={loadOn} driveCurrentA={point?.current} {...common} />
                     <Wire d="M470 224V330" on={loadOn} />
                     <Gpio x={470} y={350} label={modelName('GPIO1')} state={stateText} {...common} />
                 </g>
@@ -285,7 +286,7 @@ function TopologyBody({ config, point, selected, onSelect }) {
                     <Wire d="M470 142V155" on={loadOn} />
                     <ResV id="RLED" x={470} y={185} value={resistance} {...common} />
                     <Wire d="M470 225V240" on={loadOn} />
-                    <Led x={470} y={275} color={led.color} name={led.id} on={loadOn} {...common} />
+                    <Led x={470} y={275} color={led.color} name={led.id} on={loadOn} driveCurrentA={point?.current} {...common} />
                     <Wire d="M470 309V379" on={loadOn} />
                     <Ground />
                     <Gpio x={75} y={100} label={modelName('GPIO1')} state={stateText} {...common} />
@@ -393,7 +394,7 @@ function Compound({ config, point, led, outputFamily, inputFamily, selected, onS
             <Wire d={`M${q2x} 134V148`} on={loadOn} />
             <ResV id="RLED" x={q2x} y={178} value={resistance} {...common} />
             <Wire d={`M${q2x} 218V235`} on={loadOn} />
-            <Led x={q2x} y={270} color={led.color} name={led.id} on={loadOn} {...common} />
+            <Led x={q2x} y={270} color={led.color} name={led.id} on={loadOn} driveCurrentA={point?.current} {...common} />
             <Wire d={`M${q2x} 304V379`} on={loadOn} />
             <Ground x={q2x} />
 
@@ -473,7 +474,7 @@ export default function CircuitDiagram({ config, point, selectedInstance, onSele
                     <TopologyBody config={config} point={point} selected={selectedInstance} onSelect={onSelectInstance} />
                 </svg>
             </div>
-            <figcaption>{template?.connections.length ?? 0}개 연결 정의 · 소자를 클릭하거나 Enter로 상세 확인</figcaption>
+            <figcaption>{template?.connections.length ?? 0}개 연결 정의 · 전류 activity cue (체감 밝기 아님) · 클릭/Enter로 소자 확인</figcaption>
         </figure>
     );
 }
