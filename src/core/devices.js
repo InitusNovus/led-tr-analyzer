@@ -97,6 +97,15 @@ export function gpioVoltage(config, current, ctx) {
     finite(current, 'GPIO current');
     const part = gpioModel(config);
     ctx?.sources.add(part.source);
+    if(part.modelKind==='user-assumed-thevenin') {
+        ctx?.flags?.add('assumption:ideal-DC-control-source-no-rated-limits');
+        const state=gpioState(config),r=config.sourceResistance??0;
+        if(state==='HI_Z') {
+            if(config.pull==='none')return null;
+            return (config.pull==='up'?config.vdd:0)-current*config.pullResistance;
+        }
+        return (state==='HIGH'?config.vdd:0)-current*r;
+    }
     if (part.modelKind === 'limit-derived-approximation')
         ctx?.flags.add('approximation:GPIO-limit-points-not-typical');
     const state = gpioState(config);

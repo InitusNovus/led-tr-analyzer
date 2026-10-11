@@ -55,7 +55,7 @@ const DEFAULT_DEVICE_MODELS=Object.freeze({
 });
 export const DEFAULT_CONFIG = Object.freeze({
     topology:'digital-npn', led:'APT2012SURCK', deviceModels:DEFAULT_DEVICE_MODELS, vcc:5, vdd:3.3, resistance:330,
-    baseResistance:4700, emitterResistance:220, gateResistance:1000, pullResistance:40000, gatePull:100000,
+    baseResistance:4700, emitterResistance:220, gateResistance:1000, pullResistance:40000, gatePull:100000, sourceResistance:0,
     state:'HIGH', gpioMode:'push-pull', pull:'none', temperature:25, ambient:25, seriesCount:1,
     vfShift:0, dtcR1Scale:1, dtcRatio:10, vccTolerance:5, vddTolerance:3, resistorTolerance:1, vfSpread:.1,
     resistorRating:.125, auxRating:.1, derating:.7, otherSourceCurrent:0, otherSinkCurrent:0,
@@ -63,8 +63,8 @@ export const DEFAULT_CONFIG = Object.freeze({
 export function freshConfig() { return { ...DEFAULT_CONFIG, deviceModels:{...DEFAULT_CONFIG.deviceModels} }; }
 
 const numericRules={
-    vcc:[0,60], vdd:[0,5.5], resistance:[.001,1e7], baseResistance:[1,1e7], emitterResistance:[.001,1e7],
-    gateResistance:[1,1e7], pullResistance:[1,1e8], gatePull:[1,1e8], temperature:[-40,125], ambient:[-40,125],
+    vcc:[0,60], vdd:[0,60], resistance:[.001,1e7], baseResistance:[1,1e7], emitterResistance:[.001,1e7],
+    gateResistance:[1,1e7], pullResistance:[1,1e8], gatePull:[1,1e8], sourceResistance:[0,1e7], temperature:[-40,125], ambient:[-40,125],
     seriesCount:[1,12], vfShift:[-.5,.5], dtcR1Scale:[.01,100], dtcRatio:[.01,100],
     vccTolerance:[0,30], vddTolerance:[0,30], resistorTolerance:[0,30], vfSpread:[0,.5],
     resistorRating:[.001,10], auxRating:[.001,10], derating:[.01,1], otherSourceCurrent:[0,1], otherSinkCurrent:[0,1],
@@ -75,6 +75,7 @@ export function activeParameterNames(topology, input={}) {
     const names=new Set([...commonNumeric,...topology.activeParameters]);
     if(topologyUsesGPIO(topology)) {
         gpioNumeric.forEach(x=>names.add(x));
+        if(input.deviceModels?.GPIO1==='assumed:DC-Thevenin') names.add('sourceResistance');
         if(input.pull && input.pull!=='none') names.add('pullResistance');
     }
     return names;

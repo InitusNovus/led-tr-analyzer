@@ -51,6 +51,7 @@ export function quickSpecs(part) {
       if(range)xs.push({label:'광도 anchor',value:range,condition:Number.isFinite(o.testCurrent)?fmt(o.testCurrent,1000,'mA'):'시험전류 미확인'});
     }
   }
+  if(part.modelKind==='user-assumed-thevenin')xs.push({label:'제어원 모델',value:'이상적 DC + 설정한 출력저항',condition:'실제 전류 한계·보호·역급전 미모델링'});
   if(part.r1)put('내장 R1',part.r1,1,'Ω');
   if(part.r1&&part.ratio)put('내장 R2 (nominal)',part.r1*part.ratio,1,'Ω');
   const lim=part.limits??{};
