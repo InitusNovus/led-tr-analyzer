@@ -174,28 +174,54 @@ export default function App(){
  </div>}
      </>}
     </section>
+    <section className="panel" id="power-settings"><h2>정격·공차 입력 (오류가 나도 수정 가능)</h2>
+      <div className="fields two">
+       <label className="field" htmlFor="package"><span>RLED generic 패키지 preset</span>
+       <select id="package" value={Object.keys(PACKAGE_PRESETS).find(k=>PACKAGE_PRESETS[k]===config.resistorRating)??'custom'}
+         onChange={e=>{if(e.target.value!=='custom')set('resistorRating',PACKAGE_PRESETS[e.target.value]);}}>
+        {Object.entries(PACKAGE_PRESETS).map(([k,v])=><option key={k} value={k}>{k} · {v*1000}mW</option>)}
+        <option value="custom">직접 지정</option>
+       </select></label>
+       {number('resistorRating','RLED 실제 정격','W')}
+       {number('auxRating','보조 저항 정격','W')}
+       {number('derating','입력한 사용 비율','0–1')}
+       {number('ambient','주변 온도','°C')}
+      </div>
+      <p className="subtle">Generic preset은 실제 모든 해당 크기 저항의 정격을 보증하지 않습니다.</p>
+    </section>
    </aside>
 
    <div className="results-column">
+    <DesignSummary config={p?.config??config} point={p} validation={result.ok?result.validation:null}
+     corners={corners} mode={mode} goal={result.sizing?.goal??null} onInspect={setSelectedInstance}/>
     {!result.ok?<section className="notice error" role="alert"><h2>계산할 수 없는 조건</h2><p>{result.error.message}</p><small>{result.error.code}</small></section>:<>
      <section className="panel report" aria-label="동작점 결과" aria-live="polite"><div className="report-head"><h2>동작점</h2><span className={'status '+result.validation.status}>{result.validation.label}</span></div><div className="metrics">
       <Metric label="LED 전류" value={show(p.current,1000,'mA')} hint={p.region+' · DC'}/><Metric label="LED 전압 / 개" value={show(p.ledVf,1,'V')}/>
       {topologyUsesGPIO(t)&&<><Metric label="GPIO 전류 (+source / −sink)" value={show(p.gpioCurrent,1000,'mA')}/><Metric label="GPIO 단자 전압" value={show(p.gpioVoltage,1,'V')}/></>}
       {p.semiconductors.length>0&&<Metric label="출력 driver 전압강하" value={show(p.driverVoltage,1,'V')}/>}
-      <Metric label="광학 결과" value={show(p.luminousMcd,1,'mcd')} hint={p.luminousMcd==null?optical.label:'전형값 기반 추정 · 체감 밝기 아님'}/>
+      <Metric label="광학 결과" value={p.optical?.kind==='range'?show(p.optical.minMcd,1,'mcd')+' … '+show(p.optical.maxMcd,1,'mcd'):
+  show(p.optical?.nominalMcd,1,'mcd')}
+  hint={p.optical?.kind==='range'?'광도 bin × 상대곡선 · 보증 아님':optical.label}/>
      </div></section>
      <section className="notice model-note"><strong>모델 가정</strong><p>선택한 실제 품번의 datasheet 곡선/표를 사용하며, 자료가 없는 조건은 근사·미모델링으로 표시합니다.</p><details><summary>근사·외삽·미모델링 ({p.flags.length})</summary><ul>{p.flags.map(f=><Flag key={f} value={f}/>)}</ul></details></section>
-     <section className="panel"><h2>소자별 전력과 정격</h2><div className="fields two"><label className="field" htmlFor="package"><span>RLED 패키지 preset</span><select id="package" value={Object.keys(PACKAGE_PRESETS).find(k=>PACKAGE_PRESETS[k]===config.resistorRating)??'custom'} onChange={e=>{if(e.target.value!=='custom')set('resistorRating',PACKAGE_PRESETS[e.target.value]);}}>{Object.entries(PACKAGE_PRESETS).map(([k,v])=><option key={k} value={k}>{k} · {v*1000}mW</option>)}<option value="custom">직접 지정</option></select></label>{number('resistorRating','RLED 실제 정격','W')}{number('auxRating','보조 저항 정격','W')}{number('derating','사용 전력 비율','0–1')}{number('ambient','주변 온도','°C')}</div>
+     <section className="panel"><h2>소자별 전력과 정격</h2>
       <div className="table-scroll"><table><thead><tr><th>ref</th><th>전류</th><th>전압</th><th>DC 전력</th></tr></thead><tbody>{p.ledger.map((e,i)=><tr key={e.id+i} data-instance-id={e.instanceId}><th>{e.id}</th><td>{show(e.current,1000,'mA')}</td><td>{show(e.voltage,1,'V')}</td><td>{show(e.power,1000,'mW')}</td></tr>)}</tbody></table></div>
-      <details><summary>전체 한계 검사</summary><div className="table-scroll"><table><thead><tr><th>항목</th><th>계산값</th><th>한계</th><th>상태</th></tr></thead><tbody>{result.validation.checks.map(x=><tr key={x.id} className={x.status==='exceeded'?'limit-error':''}><th title={x.condition}>{x.id}</th><td>{show(x.actual)}</td><td>{show(x.limit)}</td><td>{x.status}</td></tr>)}</tbody></table></div></details>
+      <details><summary>전체 한계 검사</summary><div className="table-scroll"><table><thead><tr><th>항목</th><th>계산값</th><th>한계</th><th>상태</th></tr></thead><tbody>{result.validation.checks.map(x=><tr key={x.id} className={x.status==='exceeded'?'limit-error':''}><th title={x.condition}>{x.id}</th><td>{show(x.actual,x.unit==='A'||x.unit==='W'?1000:1,x.unit==='A'?'mA':x.unit==='W'?'mW':x.unit)}</td>
+ <td>{show(x.limit,x.unit==='A'||x.unit==='W'?1000:1,x.unit==='A'?'mA':x.unit==='W'?'mW':x.unit)}</td><td>{x.status}</td></tr>)}</tbody></table></div></details>
      </section>
     </>}
     <section className="panel"><h2>공차 · 감도 분석</h2><div className="fields two">{number('vccTolerance','VLED 변동','±%')}{topologyUsesGPIO(t)&&number('vddTolerance','GPIO 전원 변동','±%')}{number('resistorTolerance','RLED 공차','±%')}{number('vfSpread','LED Vf 이동 가정','±V')}</div>
+     <div className="tolerance-presets" role="group" aria-label="공차 빠른 선택">
+       {[[5,'J ±5%'],[2,'G ±2%'],[1,'F ±1%'],[.1,'B ±0.1%']].map(([v,label])=>
+        <button key={v} onClick={()=>set('resistorTolerance',v)}>{label}</button>)}
+      </div>
+      <p className="subtle">E-series는 표준값 계열이며 실제 부품 공차와 독립입니다.</p>
      {q1?.family==='digital-npn'&&<label className="check"><input id="include-dtc" type="checkbox" checked={includeDtc} onChange={e=>{setIncludeDtc(e.target.checked);setCornerSnapshot(null);}}/> Q1 R1 및 R2/R1 공차 포함</label>}
      <button className="primary" disabled={!p} onClick={()=>{try{setCornerSnapshot({key:configKey,result:analyzeCorners(p.config,{includeDtc})});}catch(e){setCornerSnapshot({key:configKey,result:{error:e.message}});}}}>현재 조건 분석</button>
      {corners&&(corners.error?<p role="alert">{corners.error}</p>:<div className="corner-results"><p>{corners.validCount}/{corners.count} 조건 계산 · {corners.failures.length}개 미지원/실패 · {corners.anyExceeded?'한계 초과 조건 있음':'계산 가능한 표본의 검사 완료'}</p>{Object.entries(corners.extrema).map(([metric,e])=>e&&<details key={metric}><summary>{metric}: {show(e.min.value,metric==='current'?1000:1000)} – {show(e.max.value,1000)} {metric==='current'?'mA':'mW'}</summary><pre>{JSON.stringify({minimum:e.min.scenario,maximum:e.max.scenario},null,2)}</pre></details>)}</div>)}
     </section>
-    <section className="panel"><h2>선택 부품의 데이터 근거</h2><div className="evidence-grid">{parts.map(({instanceId,role,modelId,part})=>{const ev=partEvidence(part),src=ev?.source;return<article className="evidence-card" key={instanceId}><div><b>{instanceId}</b><span>{role}</span></div><strong>{part.name??part.id}</strong><small>{ev?.modelKind}</small>{src&&<a href={src.url} target="_blank" rel="noreferrer">{src.manufacturer} · {src.revision} <ExternalLink size={12}/></a>}<p>{part.notes?.[0]??'등록된 모델 데이터'}</p></article>;})}</div></section>
+    <section className="panel"><h2>선택 부품의 데이터 근거</h2><div className="evidence-grid">{parts.map(({instanceId,role,modelId,part})=>{const ev=partEvidence(part),src=ev?.source;return<article className="evidence-card" key={instanceId}><div><b>{instanceId}</b><span>{role}</span></div><strong>{part.name??part.id}</strong><small>{ev?.modelKind}</small>{src&&(src.url?<a href={src.url} target="_blank" rel="noreferrer">{src.manufacturer} · {src.revision} <ExternalLink size={12}/></a>:
+   <span>{src.manufacturer} · 제조사 정격 없음</span>)}<p>{part.notes?.[0]??'등록된 모델 데이터'}</p></article>;})}</div></section>
    </div>
   </section>
   <footer>DC 축약 모델 · SPICE/IBIS 없음 · 제작 전 원문 데이터시트와 실측 확인</footer>
