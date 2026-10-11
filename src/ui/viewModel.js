@@ -1,4 +1,6 @@
 import { LEDS, SOURCES, getDeviceModel } from '../data/catalog.js';
+import { circuitTemplate } from './circuitTemplates.js';
+import { opticalCapability } from '../core/optics.js';
 
 export function selectedParts(config, topology){
   const parts=[{instanceId:'LED1',role:'LED',modelId:config.led,part:LEDS[config.led]}];
@@ -10,63 +12,108 @@ export function selectedParts(config, topology){
   return parts;
 }
 export function opticalEvidence(led){
-  const o=led?.optical;
-  if(!o) return {code:'none',label:'광학 모델 없음'};
-  if(Number.isFinite(o.nominalMcd)&&o.relative) return {code:'scalar-curve',label:'절대 광도 anchor + 상대곡선'};
-  if(Number.isFinite(o.nominalMcd)) return {code:'test-point-only',label:'단일 시험점 광도'};
-  if(Number.isFinite(o.minMcd)||Number.isFinite(o.maxMcd)) return {code:'range-only',label:'원문 광도 범위 있음 · 단일 typ 없음'};
-  return {code:'metadata-only',label:'광학 metadata만 있음'};
+  const c=opticalCapability(led);
+  if(c.kind==='range')return {code:'range',label:'원문 광도 bin 범위 + 전류 상대곡선'};
+  if(c.kind==='scalar')return {code:'scalar-curve',label:'광도 typ anchor + 상대곡선'};
+  if(c.kind==='test-point')return {code:'test-point-only',label:'단일 광도 시험점만 확인'};
+  return {code:'unavailable',label:c.reason==='absolute-optical-test-current-unknown'?'광도 시험전류 미확인':'검증 가능한 광학 anchor 없음'};
 }
 export function partEvidence(part){
   if(!part) return null;
   const source=SOURCES[part.source]??null;
   const capabilities=[];
-  if(part.vf) capabilities.push('Vf(I) curve');
-  if(part.vfTableOnly) capabilities.push('Vf table-only');
-  if(Number.isFinite(part.vfTempCoefficient)||part.optical?.temperature) capabilities.push('temperature evidence');
-  if(part.gain) capabilities.push('gain/VBE curves');
-  if(part.output) capabilities.push('output curves');
-  if(part.on&&part.gain) capabilities.push('terminal curves');
-  if(part.drop) capabilities.push('GPIO limit curve');
+  if(part.vf)capabilities.push('Vf(I) characteristic');
+  if(part.vfTableOnly)capabilities.push('Vf table-only');
+  if(Number.isFinite(part.vfTempCoefficient))capabilities.push('전기적 온도 보정');
+  if(part.optical?.temperature)capabilities.push('광학 온도 곡선');
+  if(part.currentDerating||part.thermalResistance)capabilities.push('열 한계 근거');
+  if(part.gain)capabilities.push('gain/VBE curves');
+  if(part.output)capabilities.push('output curves');
+  if(part.on&&part.gain)capabilities.push('terminal curves');
+  if(part.drop)capabilities.push('GPIO drop approximation');
   return {source,modelKind:part.modelKind??part.kind??'data',capabilities};
 }
 const fmt=(v,scale=1,unit='')=>v==null||!Number.isFinite(v)?'—':String(Number((v*scale).toPrecision(4)))+(unit?' '+unit:'');
-export function buildInstanceViews(config,point,validation){
-  const map=new Map();
-  const ensure=(id,label=id)=>{if(!map.has(id))map.set(id,{instanceId:id,label,metrics:[],checks:[],modelId:null,part:null});return map.get(id);};
+export function quickSpecs(part) {
+  if(!part)return [];
+  const xs=[];
+  const put=(label,v,scale,unit,condition)=>{if(v!=null&&Number.isFinite(v))xs.push({label,value:fmt(v,scale,unit),condition:condition??null});};
+  if(part.source?.startsWith('kento')||part.vfTest||part.vfTableOnly) {
+    if(part.vfTest) {
+      const vf=part.vfTest;
+      const v=[vf.min!=null?fmt(vf.min,1,'V'):null,vf.typ!=null?fmt(vf.typ,1,'V'):null,vf.max!=null?fmt(vf.max,1,'V'):null].filter(Boolean).join(' / ');
+      if(v)xs.push({label:'Vf min / typ / max',value:v,condition:fmt(vf.current,1000,'mA')+' · '+(vf.condition??'')});
+    }
+    const o=part.optical;
+    if(o) {
+      const range=Number.isFinite(o.minMcd)&&Number.isFinite(o.maxMcd)?fmt(o.minMcd,1,'mcd')+' … '+fmt(o.maxMcd,1,'mcd'):
+        Number.isFinite(o.nominalMcd)?fmt(o.nominalMcd,1,'mcd')+' typ':null;
+      if(range)xs.push({label:'광도 anchor',value:range,condition:Number.isFinite(o.testCurrent)?fmt(o.testCurrent,1000,'mA'):'시험전류 미확인'});
+    }
+  }
+  if(part.r1)put('내장 R1',part.r1,1,'Ω');
+  if(part.r1&&part.ratio)put('내장 R2 (nominal)',part.r1*part.ratio,1,'Ω');
+  const lim=part.limits??{};
+  put('전류 최대(정격)',lim.current,1000,'mA');
+  put('전압 한계',lim.voltage,1,'V');
+  put('소자 전력 한계',lim.power,1000,'mW','제조사 실장 조건 확인');
+  return xs;
+}
+export function buildInstanceViews(config,point,validation) {
+  const map=new Map(),tpl=circuitTemplate(config.topology);
+  const ensure=(id,label=id)=>{if(!map.has(id))map.set(id,{instanceId:id,label,metrics:[],checks:[],modelId:null,part:null,region:null});return map.get(id);};
+  for(const id of tpl?.instances??[]) ensure(id);
   const metric=(id,label,value,scale=1,unit='')=>ensure(id).metrics.push({label,value,display:fmt(value,scale,unit)});
-  const led=ensure('LED1','LED1');led.modelId=config.led;led.part=LEDS[config.led];
-  const rled=ensure('RLED','RLED');
+  const led=ensure('LED1');led.modelId=config.led;led.part=LEDS[config.led];
+  for(const [id,modelId] of Object.entries(config.deviceModels??{})){
+    const v=map.get(id);if(v){v.modelId=modelId;v.part=getDeviceModel(modelId);}
+  }
+  for(const v of map.values()) {
+    if(v.instanceId.startsWith('Q1.'))v.parentInstanceId='Q1';
+    v.evidence=v.part?partEvidence(v.part):null;
+    v.specs=v.part?quickSpecs(v.part):[];
+  }
   if(point){
-    metric('LED1','전류',point.current,1000,'mA');metric('LED1','Vf / 개',point.ledVf,1,'V');metric('LED1','string power',point.current*point.ledVf*config.seriesCount,1000,'mW');
-    if(point.luminousMcd!=null)metric('LED1','광도 추정',point.luminousMcd,1,'mcd');
+    metric('LED1','전류',point.current,1000,'mA');
+    metric('LED1','Vf / 개',point.ledVf,1,'V');
+    metric('LED1','LED string power',point.current*point.ledVf*config.seriesCount,1000,'mW');
+    if(point.optical?.kind==='range')metric('LED1','광도 min',point.optical.minMcd,1,'mcd'),
+        metric('LED1','광도 max',point.optical.maxMcd,1,'mcd');
+    if(point.optical?.nominalMcd!=null)metric('LED1','광도 typ',point.optical.nominalMcd,1,'mcd');
     metric('RLED','저항',config.resistance,1,'Ω');metric('RLED','전력',point.resistorPower,1000,'mW');
     if(config.deviceModels?.GPIO1){
-      const g=ensure('GPIO1','GPIO1');g.modelId=config.deviceModels.GPIO1;g.part=getDeviceModel(g.modelId);
-      metric('GPIO1','핀 전류',point.gpioCurrent,1000,'mA');metric('GPIO1','단자 전압',point.gpioVoltage,1,'V');
+      metric('GPIO1','핀 전류 (+source)',point.gpioCurrent,1000,'mA');
+      metric('GPIO1','단자 전압',point.gpioVoltage,1,'V');
     }
     for(const q of point.semiconductors){
-      const v=ensure(q.instanceId??q.id,q.instanceId??q.id);v.modelId=q.modelId;v.part=getDeviceModel(q.modelId);
-      metric(v.instanceId,'전류',q.current,1000,'mA');metric(v.instanceId,'전압강하',q.voltage,1,'V');metric(v.instanceId,'손실',q.power,1000,'mW');
-      if(q.base!=null)metric(v.instanceId,'IB',q.base,1000,'mA');
-      if(q.emitter!=null)metric(v.instanceId,'IE',q.emitter,1000,'mA');
-      if(q.gate!=null)metric(v.instanceId,'|VGS|',Math.abs(q.gate),1,'V');
-      v.region=q.region;
+      const id=q.instanceId??q.id, v=ensure(id);
+      v.modelId=q.modelId;v.part=getDeviceModel(q.modelId);
+      metric(id,'전류',q.current,1000,'mA');
+      metric(id,'전압강하',q.voltage,1,'V');
+      metric(id,'손실',q.power,1000,'mW');
+      if(q.base!=null)metric(id,'IB',q.base,1000,'mA');
+      if(q.emitter!=null)metric(id,'IE',q.emitter,1000,'mA');
+      if(q.gate!=null)metric(id,'|VGS|',Math.abs(q.gate),1,'V');
+      if(q.base>0)metric(id,'IC/IB',q.current/q.base,1,'');
+      if(q.region)v.region=q.region;
+      v.evidence=partEvidence(v.part);v.specs=quickSpecs(v.part);
     }
-    for(const e of point.ledger){
-      if(['LED1','RLED'].includes(e.instanceId)) continue;
-      if(point.semiconductors.some(q=>(q.instanceId??q.id)===e.instanceId)) continue;
-      const v=ensure(e.instanceId??e.id,e.id);
-      if(e.resistance!=null)metric(v.instanceId,'저항',e.resistance,1,'Ω');
-      metric(v.instanceId,'전류',e.current,1000,'mA');metric(v.instanceId,'전력',e.power,1000,'mW');
+    if(point.externalInputCurrent!=null && point.externalInputCurrent>0) {
+      metric('Q1','external IO/II',point.current/point.externalInputCurrent,1,'');
+      metric('Q1','external II',point.externalInputCurrent,1000,'mA');
     }
-  } else if(config.deviceModels?.GPIO1){
-    const g=ensure('GPIO1','GPIO1');g.modelId=config.deviceModels.GPIO1;g.part=getDeviceModel(g.modelId);
+    for(const e of point.ledger) {
+      const id=e.instanceId??e.id;
+      if(['LED1','RLED'].includes(id))continue;
+      if(point.semiconductors.some(q=>(q.instanceId??q.id)===id))continue;
+      if(!map.has(id))continue; // non-component ledger entries are not clickable instances
+      if(e.resistance!=null)metric(id,'저항',e.resistance,1,'Ω');
+      metric(id,'전류',e.current,1000,'mA');
+      metric(id,'전력',e.power,1000,'mW');
+    }
   }
-  for(const [id,v] of map){
-    if(v.modelId==null&&config.deviceModels?.[id]){v.modelId=config.deviceModels[id];v.part=getDeviceModel(v.modelId);}
-    v.evidence=v.part?partEvidence(v.part):null;
-    v.checks=(validation?.checks??[]).filter(c=>c.id===id||c.id.startsWith(id+' ')||c.id.startsWith(id+'.'));
+  for(const v of map.values()){
+    v.checks=(validation?.checks??[]).filter(c=>c.instanceId===v.instanceId);
   }
   return [...map.values()];
 }
