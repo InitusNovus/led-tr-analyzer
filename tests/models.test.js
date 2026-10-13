@@ -51,8 +51,9 @@ test('KT table-only Y/W models expose midpoint/current-shape assumptions instead
 test('KT min/max intensity ranges are not converted into invented typical mcd', () => {
     for (const id of ['KT-0805R','KT-0805G','KT-0805B','KT-0805YG','KT-0805Y','KT-0805O']) {
         const ctx = context();
-        assert.equal(luminousIntensity(id, LEDS[id].optical.testCurrent, 25, ctx), null);
-        assert.ok(ctx.flags.has('not-modeled:LED-absolute-optical-anchor'));
+        assert.equal(luminousIntensity(id, Number.isFinite(LEDS[id].optical.testCurrent)?LEDS[id].optical.testCurrent:.01, 25, ctx), null);
+        if(id==='KT-0805Y')assert.ok(ctx.flags.has('not-modeled:LED-absolute-optical-anchor'));
+        else assert.equal(ctx.flags.has('not-modeled:LED-absolute-optical-anchor'),false);
     }
 });
 test('curve endpoints are preserved and provenance is resolvable', () => {
@@ -148,4 +149,18 @@ test('BSS138BKW provenance points to the actual Table 7 characteristics section'
  const p=MOSFET_MODELS['nexperia:BSS138BKW'];
  assert.ok(p.notes.some(x=>x.includes('Table 7 gives RDS(on)')));
  assert.equal(SOURCES[p.source].revision,'Rev.1 / 2011-08-12');
+});
+
+test('ideal DC control source supports separate 5V input without borrowing MCU limits', async () => {
+    const { analyzePoint }=await import('../src/core/analysis.js');
+    const { transitionConfig }=await import('../src/core/topologies.js');
+    const { getDeviceModel }=await import('../src/data/catalog.js');
+    const cfg=transitionConfig(DEFAULT_CONFIG,'npn-low');
+    const r=analyzePoint({...cfg,vdd:5,sourceResistance:15,deviceModels:{...cfg.deviceModels,GPIO1:'assumed:DC-Thevenin'}});
+    assert.ok(r.ok,JSON.stringify(r.error));
+    assert.ok(r.point.flags.includes('assumption:ideal-DC-control-source-no-rated-limits'));
+    assert.equal(r.validation.checks.find(x=>x.ruleId==='driver-pin-current').status,'unknown');
+    assert.equal(getDeviceModel('assumed:DC-Thevenin').family,'gpio');
+    const mcu=analyzePoint({...cfg,vdd:5});
+    assert.equal(mcu.error.code,'unsupported');
 });

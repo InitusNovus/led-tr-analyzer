@@ -16,6 +16,7 @@ export const SOURCES = {
     nmos: { manufacturer: 'Nexperia', revision: 'Rev.7 / 2011-09-08', url: 'https://assets.nexperia.com/documents/data-sheet/2N7002.pdf' },
     nmosBss138: { manufacturer: 'Nexperia', revision: 'Rev.1 / 2011-08-12', url: 'https://assets.nexperia.com/documents/data-sheet/BSS138BKW.pdf' },
     pmos: { manufacturer: 'NXP / Nexperia', revision: 'Rev.06 / 2008-12-16', url: 'https://assets.nexperia.com/documents/data-sheet/BSS84.pdf' },
+    idealControl: { manufacturer: 'User-defined assumption', revision: 'Ideal DC Thevenin source; no manufacturer rating', url: null },
     gpio: { manufacturer: 'STMicroelectronics', revision: 'DS13560 Rev.6', url: 'https://www.st.com/resource/en/datasheet/stm32g0b1cc.pdf' },
 };
 const graph = (source, figure, conditions, points, logX = true, logY = false) => ({
@@ -253,7 +254,14 @@ export const MOSFET_MODELS = {
     [BSS138BKW.modelId]: BSS138BKW,
     [MOSFETS.pmos.modelId]: MOSFETS.pmos,
 };
-export const GPIO_MODELS = { [GPIO.modelId]: GPIO };
+export const IDEAL_CONTROL = {
+    id:'USER-DC-SOURCE',modelId:'assumed:DC-Thevenin',name:'직접 지정 DC 제어원 (가정)',source:'idealControl',family:'gpio',
+    modelKind:'user-assumed-thevenin',voltageRange:[0,60],
+    limits:{current:null,totalSource:null,totalSink:null},
+    notes:['User-selected high/low voltage and source resistance, not a verified GPIO model.',
+        'No guaranteed current limit, reverse-injection, powered-off behavior or short-circuit protection.']
+};
+export const GPIO_MODELS = { [GPIO.modelId]: GPIO, [IDEAL_CONTROL.modelId]: IDEAL_CONTROL };
 export const DEVICE_MODELS = { ...BJT_MODELS, ...DIGITAL_MODELS, ...MOSFET_MODELS, ...GPIO_MODELS };
 export const DEFAULT_MODEL_BY_FAMILY = Object.freeze({
     npn: BJTS.npn.modelId,

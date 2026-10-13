@@ -1,5 +1,6 @@
 import { interpolate, clamp, finite } from './math.js';
 import { LEDS, DEFAULT_MODEL_BY_FAMILY, getDeviceModel } from '../data/catalog.js';
+import { opticalAtCurrent } from './optics.js';
 
 const LEGACY_MODEL_ALIASES = Object.freeze({
     npn: DEFAULT_MODEL_BY_FAMILY.npn,
@@ -81,33 +82,9 @@ export function ledVoltage(id, current, temperature = 25, shift = 0, ctx) {
         ctx?.flags.add('approximation:nonnegative-LED-voltage');
     return Math.max(0, v);
 }
-export function luminousIntensity(id, current, temperature = 25, ctx) {
-    const part = LEDS[id];
-    if (!part?.optical)
-        return null;
-    const o = part.optical;
-    if (current === 0)
-        return 0;
-    if (!Number.isFinite(o.nominalMcd)) {
-        ctx?.flags.add('not-modeled:LED-absolute-optical-anchor');
-        return null;
-    }
-    if (!o.relative) {
-        if (Number.isFinite(o.testCurrent) && Math.abs(current - o.testCurrent) <= Math.max(1e-9, o.testCurrent * .01) && temperature === 25)
-            return o.nominalMcd;
-        ctx?.flags.add('not-modeled:LED-optical-current-shape');
-        return null;
-    }
-    let relative = sample(o.relative, current, ctx, 'LED-optical-current');
-    if (temperature !== 25) {
-        if (!o.temperature) {
-            ctx?.flags.add('not-modeled:LED-optical-temperature');
-            return null;
-        }
-        relative *= sample(o.temperature, temperature, ctx, 'LED-optical-temperature');
-        ctx?.flags.add('approximation:optical-temperature-separable');
-    }
-    return Math.max(0, o.nominalMcd * relative);
+/** Compatibility scalar API. Range-only devices intentionally have no invented nominal mcd. */
+export function luminousIntensity(id,current,temperature=25,ctx){
+    return opticalAtCurrent(id,current,temperature,ctx).nominalMcd;
 }
 export function gpioState(config) {
     return config.gpioMode === 'open-drain' && config.state === 'HIGH' ? 'HI_Z' : config.state;
@@ -120,6 +97,15 @@ export function gpioVoltage(config, current, ctx) {
     finite(current, 'GPIO current');
     const part = gpioModel(config);
     ctx?.sources.add(part.source);
+    if(part.modelKind==='user-assumed-thevenin') {
+        ctx?.flags?.add('assumption:ideal-DC-control-source-no-rated-limits');
+        const state=gpioState(config),r=config.sourceResistance??0;
+        if(state==='HI_Z') {
+            if(config.pull==='none')return null;
+            return (config.pull==='up'?config.vdd:0)-current*config.pullResistance;
+        }
+        return (state==='HIGH'?config.vdd:0)-current*r;
+    }
     if (part.modelKind === 'limit-derived-approximation')
         ctx?.flags.add('approximation:GPIO-limit-points-not-typical');
     const state = gpioState(config);

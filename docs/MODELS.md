@@ -112,3 +112,36 @@ Body diode, 역방향 동작, Miller/게이트 전하, 자가발열/SOA, 실제 
 ## 아직 구현하지 않은 후보
 
 #1 Phase5의 2소자 피드백/OPAMP 전류 싱크, 정전류 IC, 병렬 가지/RGB/바이컬러는 후속 후보입니다. 동일 LED 직렬 연결만 이번 구현에 포함됩니다. UI로 모델 파일을 가져오거나 임의 소자를 배선하는 편집기도 없습니다. PR은 이 항목을 완료로 체크하지 않습니다.
+
+
+## 광도 range-aware 모델 (이슈 #20)
+
+`src/core/optics.js`는 scalar typ, datasheet min/max range, 단일 시험점(test-point) 및 unavailable을 구분합니다.
+
+KENTO R/G/B/YG/O는 원문 absolute optical anchor `Iv_min/max(I_test)`와 전형적인 상대 광도곡선 `R(I)`를 별도로 보존합니다. 임의 전류에서의 추정은:
+
+```text
+scale(I, T=25C) = R(I) / R(I_test)
+Iv_min_est(I) = Iv_min(I_test) * scale(I)
+Iv_max_est(I) = Iv_max(I_test) * scale(I)
+```
+
+예를 들어 KT-0805G의 절대 광도 시험점이 5mA이고 상대곡선이 20mA 근처에서 정규화돼 있더라도, 계산은 20mA의 기준값을 그대로 곱하지 않고 `R(20mA)/R(5mA)`를 사용합니다.
+
+**의미상 주의:** 제조사 bin min/max는 해당 **시험점**의 특성입니다. 다른 전류·온도로 전형곡선을 곱한 결과는 보증 최저/최고값이 아닙니다. `basis='min'`은 “최저 bin *기준* 추정”이며 보증최소 광도나 생산 수율 예측이 아닙니다. 중간 대표값 역시 제조사 typ가 아닙니다.
+
+온도 곡선은 제공된 경우 `R_T(T)/R_T(25C)`를 추가로 곱하고 전류·온도 분리가능성 근사를 플래그로 표시합니다. 곡선 바깥의 forward 추정은 extrapolation 플래그가 붙습니다. **광도 목표 역산은 곡선의 수집된 점 구간만 탐색**하고 상승 구간을 차례로 확인하여 최초 달성 전류를 찾습니다. 단일 시험점 W와 시험전류 미확인 Y는 역산을 하지 않습니다.
+
+저항 역산은 `optical basis → I_target → 동일 DC topology solver → E-series → 실제 선정 저항의 optical` 순으로 진행합니다. `safe`(큰 저항) 반올림이 최소 광도 목표 미달로 이어질 수 있으므로 목표 달성을 재확인합니다.
+
+`opticalUsageGuide()`는 초기 버전의 mcd 숫자 해석을 돕는 **비정량적 실무 가이드**이며 광도·정격 solver의 입력이 아닙니다. 상대 광도는 눈으로 느끼는 밝기와 일대일 대응하지 않으며 색·거리·시야각·주변조도·광학구조·PWM을 모델링하지 않습니다.
+
+## 사용자 가정 독립 제어원과 canonical 검사 (이슈 #21)
+
+`assumed:DC-Thevenin`은 사용자가 지정한 HIGH 전압(현재 UI의 VDD)과 `sourceResistance`를 사용합니다. LOW 0V, open-drain/Hi-Z/pull 의미는 GPIO 인터페이스 계약을 재사용하되 **실제 STM32G0B1 특성·정격을 차용하지 않습니다**. `driver-pin-current`/source/sink 예산의 한계는 null=unknown이며, 표시에는 `assumption:ideal-DC-control-source-no-rated-limits`가 붙습니다. 실제 MCU가 아닌 설정값이고 역급전·보호·전원 OFF·과도전류는 미모델링입니다.
+
+`checkLimits()`는 기존 사용자 표시 이름 `id`와 별개로 `ruleId`, `instanceId`, `metric`, `unit`, `scope`, `basis`를 반환합니다. 회로 템플릿과 ledger의 `RGS_IN/RGS_OUT` 식별자를 동일하게 사용합니다. 동작점이 계산되지 않아도 각 회로의 정적 instance는 `buildInstanceViews()`에 존재합니다. 다른 Q1으로 무음 fallback하지 않습니다.
+
+Nominal 검사와 `analyzeCorners()`의 sampled extrema 및 위반 witness는 **서로 다른 scope**이며, sampled에서 일부 실패한 경우 전체 범위가 검증된 것으로 표시하지 않습니다. Optical bin range(동일 전류의 광학 범위)와 optical sampled range(여러 전기 조건으로 달라진 범위)도 별도의 개념입니다. 독립 광도/mA 목표 draft를 저장하므로 단위를 바꾸거나 미지원 LED로 전환해도 숫자를 잘못 재사용하지 않습니다.
+
+모든 모드에서 정격 입력은 계산 결과 조건문 밖에서 렌더링하고, 빈칸은 0으로 강제 대체하지 않고 필드 오류 및 유효하지 않은 계산 상태로 취급합니다. JSON `schemaVersion:3`에서 `designIntent`과 `optical` 구조화 근거를 내보냅니다.

@@ -10,7 +10,7 @@ const expected={
  'npn-low':['GPIO1','RB','Q1','RLED','LED1'],'npn-follower':['GPIO1','RB','Q1','RLED','LED1'],
  'npn-current-sink':['GPIO1','RB','Q1','RE','RLED','LED1'],'nmos-low':['GPIO1','RG','RGS','Q1','RLED','LED1'],
  'pnp-high':['GPIO1','RB','Q1','RLED','LED1'],'pmos-high':['GPIO1','RG','RGS','Q1','RLED','LED1'],
- 'npn-pnp':['GPIO1','RB','Q1','Rdrive','RBE','Q2','RLED','LED1'],'npn-pmos':['GPIO1','RB','Q1','Rdrive','RGS','Q2','RLED','LED1'],
+ 'npn-pnp':['GPIO1','RB','Q1','Rdrive','RBE','Q2','RLED','LED1'],'npn-pmos':['GPIO1','RB','Q1','Rdrive','RGS_OUT','Q2','RLED','LED1'],
  'nmos-pmos':['GPIO1','RG','RGS_IN','Q1','Rdrive','RGS_OUT','Q2','RLED','LED1']
 };
 for(const t of TOPOLOGIES)test(t.id+' circuit template has independent expected instances',()=>{
@@ -37,4 +37,46 @@ test('schema-v1 style config without deviceModels migrates to the historical fix
  const c=normalizeConfig(legacy);
  assert.equal(c.deviceModels.Q1,'onsemi:MMBT3904LT1G');
  assert.equal(c.deviceModels.GPIO1,'st:STM32G0B1-general');
+});
+
+test('all circuit instances have a static view even when point is unavailable', async()=>{
+ const { buildInstanceViews }=await import('../src/ui/viewModel.js');
+ for(const t of TOPOLOGIES){
+  const c=normalizeConfig(transitionConfig(DEFAULT_CONFIG,t.id)),v=buildInstanceViews(c,null,null);
+  for(const id of CIRCUIT_TEMPLATES[t.id].instances)
+   assert.ok(v.find(x=>x.instanceId===id),t.id+': '+id+' static view absent');
+ }
+});
+test('nmos-pmos gate pull resistors share identical template/solver/inspector IDs',async()=>{
+ const { analyzePoint }=await import('../src/core/analysis.js');
+ const { buildInstanceViews }=await import('../src/ui/viewModel.js');
+ const c=transitionConfig(DEFAULT_CONFIG,'nmos-pmos'),r=analyzePoint(c);
+ assert.ok(r.ok,JSON.stringify(r.error));
+ const v=buildInstanceViews(r.point.config,r.point,r.validation);
+ for(const id of ['RGS_IN','RGS_OUT']){
+   assert.ok(r.point.ledger.some(x=>x.instanceId===id),id+' ledger absent');
+   assert.ok(v.find(x=>x.instanceId===id)?.metrics.length,id+' inspector metrics absent');
+ }
+});
+test('check schemas have canonical component IDs, units and scopes',async()=>{
+ const { analyzePoint }=await import('../src/core/analysis.js');
+ const {buildInstanceViews}=await import('../src/ui/viewModel.js');
+ const c=transitionConfig(DEFAULT_CONFIG,'digital-npn'),r=analyzePoint(c);
+ assert.ok(r.ok);
+ for(const check of r.validation.checks){
+   assert.ok(check.ruleId && check.instanceId && check.unit && check.scope==='nominal');
+   assert.ok(buildInstanceViews(r.point.config,r.point,r.validation).some(x=>x.instanceId===check.instanceId));
+ }
+});
+
+test('every resistor ledger reference maps to the same named topology instance',async()=>{
+ const { analyzePoint }=await import('../src/core/analysis.js');
+ for(const t of TOPOLOGIES) {
+  const cfg=transitionConfig(DEFAULT_CONFIG,t.id),r=analyzePoint(cfg);
+  if(!r.ok)continue;
+  const names=new Set(CIRCUIT_TEMPLATES[t.id].instances);
+  for(const e of r.point.ledger.filter(e=>e.kind==='resistor')) {
+    assert.ok(names.has(e.instanceId),t.id+' unknown resistor instance: '+e.instanceId);
+  }
+ }
 });
