@@ -1,6 +1,7 @@
-import React,{useMemo,useState}from'react';
+import React,{useMemo,useReducer}from'react';
 import{ArrowLeft,Download,ExternalLink,RotateCcw,Zap,ChevronRight}from'lucide-react';
-import{DEFAULT_CONFIG,TOPOLOGIES,freshConfig,transitionConfig,topologyById,topologyUsesGPIO}from'./core/topologies.js';
+import{TOPOLOGIES,topologyById,topologyUsesGPIO}from'./core/topologies.js';
+import{designReducer,initialDesignState}from'./ui/designState.js';
 import{analyzePoint,analyzeCorners,selectResistance}from'./core/analysis.js';
 import{LEDS,SOURCES,PACKAGE_PRESETS,modelsForFamily,getDeviceModel}from'./data/catalog.js';
 import{selectedParts,partEvidence,opticalEvidence,buildInstanceViews}from'./ui/viewModel.js';
@@ -64,15 +65,18 @@ function Inspector({view}){
  </div>;
 }
 export default function App(){
- const[config,setConfig]=useState(()=>freshConfig()),[mode,setMode]=useState('verify');
- const[targetMa,setTargetMa]=useState(10),[targetMcd,setTargetMcd]=useState(60),
-  [targetKind,setTargetKind]=useState('current'),[opticalBasis,setOpticalBasis]=useState('typ'),
-  [opticalNotice,setOpticalNotice]=useState('');
- const[series,setSeries]=useState('E24+E96'),[strategy,setStrategy]=useState('closest'),[cornerSnapshot,setCornerSnapshot]=useState(null),[includeDtc,setIncludeDtc]=useState(false),[selectedInstance,setSelectedInstance]=useState('Q1');
+ const[state,dispatch]=useReducer(designReducer,undefined,initialDesignState);
+ const{config,mode,targetMa,targetMcd,targetKind,opticalBasis,opticalNotice,series,strategy,cornerSnapshot,includeDtc,selectedInstance}=state;
+ const patch=(p,invalidate=false)=>dispatch({type:'patch',patch:p,invalidate});
+ const setMode=v=>patch({mode:v}),setTargetMa=v=>patch({targetMa:v}),setTargetMcd=v=>patch({targetMcd:v}),
+  setOpticalBasis=v=>patch({opticalBasis:v}),setSeries=v=>patch({series:v}),setStrategy=v=>patch({strategy:v}),
+  setIncludeDtc=v=>patch({includeDtc:v}),setCornerSnapshot=v=>patch({cornerSnapshot:v}),setSelectedInstance=v=>patch({selectedInstance:v});
  const t=topologyById(config.topology),led=LEDS[config.led],optical=opticalEvidence(led);
- const set=(key,value)=>{setCornerSnapshot(null);setConfig(c=>({...c,[key]:value}));};
- const setDevice=(id,value)=>{setCornerSnapshot(null);setSelectedInstance(id);setConfig(c=>({...c,deviceModels:{...(c.deviceModels??{}),[id]:value}}));};
- const changeTopology=id=>{const next=topologyById(id);setCornerSnapshot(null);setConfig(c=>transitionConfig(c,id));if(!next.supportedOperations.includes('size'))setMode('verify');setSelectedInstance(next.deviceSlots.find(s=>s.id==='Q1')?'Q1':'LED1');};
+ const set=(key,value)=>dispatch({type:'config',key,value});
+ const setDevice=(id,value)=>dispatch({type:'device',id,value});
+ const changeTopology=id=>dispatch({type:'topology',id});
+ const changeLed=id=>dispatch({type:'led',id});
+ const changeTargetKind=kind=>dispatch({type:'targetKind',kind});
  const opticalCap=opticalCapability(led);
  const result=useMemo(()=>{
    if(mode==='verify')return analyzePoint(config);
@@ -83,20 +87,7 @@ export default function App(){
  },[config,mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy]);
  const p=result.ok?result.point:null,applied=p?.config??null,configKey=JSON.stringify({applied,mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy,includeDtc}),corners=cornerSnapshot&&p&&cornerSnapshot.key===configKey?cornerSnapshot.result:null;
  const parts=selectedParts(config,t),views=buildInstanceViews(applied??config,p,result.ok?result.validation:null),activeSelected=selectedInstance,selectedView=views.find(v=>v.instanceId===selectedInstance)??null;
- const reset=()=>{setConfig(freshConfig());setMode('verify');setTargetMa(10);setTargetMcd(60);setTargetKind('current');
-   setOpticalBasis('typ');setOpticalNotice('');setSeries('E24+E96');setStrategy('closest');setIncludeDtc(false);setCornerSnapshot(null);setSelectedInstance('Q1');};
- const changeLed=id=>{
-   const cap=opticalCapability(LEDS[id]);set('led',id);setSelectedInstance('LED1');
-   setOpticalBasis(cap.hasRange?'min':'typ');
-   if(targetKind==='mcd'&&!cap.canInvert){
-     setTargetKind('current');
-     setOpticalNotice('선택 LED에 광도 역산 근거가 없어 전류 목표로 돌아왔습니다. 이전 mcd 입력값은 보존했습니다.');
-   }else setOpticalNotice('');
- };
- const changeTargetKind=kind=>{
-   if(kind==='mcd'&&!opticalCap.canInvert)return;
-   setCornerSnapshot(null);setTargetKind(kind);setOpticalNotice('');
- };
+ const reset=()=>dispatch({type:'reset'});
  const exportResult=()=>{if(!p)return;const modelSnapshot=selectedParts(p.config,t).map(x=>({instanceId:x.instanceId,modelId:x.modelId,source:x.part.source,sourceRevision:SOURCES[x.part.source]?.revision??null,modelKind:x.part.modelKind??x.part.kind??null}));const report={schemaVersion:3,application:'LED-TR Analyzer',scope:'datasheet-based reduced DC model, not SPICE',inputDraft:config,designIntent:{mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy},appliedConfiguration:p.config,modelSnapshot,result,corners,optical:p.optical,goal:result.sizing?.goal??null,migrationNote:'v3 structured optical range and independent mA/mcd goals; v2 stored exact model IDs.'};const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='led-tr-analysis-v3.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  const number=(name,label,unit='',step='any')=><NumberField key={name} name={name} label={label} unit={unit} step={step} value={config[name]} onChange={v=>set(name,v)}/>;
  const q1=getDeviceModel(config.deviceModels?.Q1),sizeSupported=t.supportedOperations.includes('size');
