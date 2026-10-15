@@ -36,11 +36,11 @@
 | KT-0805O | C110371 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 1.8–2.4V @10mA; IV 70–175mcd @20mA; IF 25mA; Pd 40mW |
 | KT-0805W | C34499 | C34499-associated KENTO A3, 2017-05-16을 pin | Vf 2.6–3.2V @5mA; IV typ 350mcd @5mA; IF 25mA; Pd 80mW |
 
-R/G/B/YG/O는 같은 원문에 실린 Typical Electrical-Optical Characteristics Curves를 거칠게 수동 판독하여 `manual-curve`로 사용합니다. 곡선은 전형값이며 생산 분포의 보증곡선이 아닙니다. R/YG/O의 p.3 Vf 행은 10mA인데 p.4 voltage-bin 표는20mA이므로 서로 다른 시험조건으로 따로 저장합니다.
+R/G/B/YG/O는 같은 원문에 실린 Typical Electrical-Optical Characteristics Curves를 거칠게 수동 판독하여 `manual-curve`로 사용합니다. 곡선은 전형값이며 생산 분포의 보증곡선이 아닙니다. R/YG/O의 p.3 Vf 행은 10mA인데 p.4 voltage-bin 표는 20mA이므로 서로 다른 시험조건으로 따로 저장합니다.
 
 Y는 source identity와 LCSC/JLCPCB에서 노출되는 Vf 1.8–2.4V, 175mcd, 40mW, −40…85°C는 확인했지만, 현재 접근 가능한 원문에서 Vf/IV 시험전류와 IF/IFP/VR 행을 신뢰성 있게 추출하지 못했습니다. 따라서 형제 KT 품번의 값을 복사하지 않고 해당 항목은 unknown으로 둡니다. `datasheet-table-only`의 2.1V midpoint는 **명시적 계산 가정**이며 모든 전류에서 current-shape 미모델링 플래그를 냅니다.
 
-White C34499는 웹의 다른 mirror에 같은 제품명/비슷한 revision을 가진 사본이 있으나 Pd, IF 및 광학 시험조건이 C34499-associated LCSC 문서와 충돌합니다. 이 모델은 **LCSC에 직접 연결된 A3 2017-05-16 문서**만 pin하고 다른 mirror의 숫자를 합치지 않습니다. 동일 source의 current-dependence curve를 이번 PR에서 확인하지 못했으므로 Vf는 2.6–3.2V의 midpoint 2.9V를 명시적 table-only 가정으로 사용하고, 광도 350mcd는 정확히5mA/25°C 시험점에서만 반환합니다.
+White C34499는 웹의 다른 mirror에 같은 제품명/비슷한 revision을 가진 사본이 있으나 Pd, IF 및 광학 시험조건이 C34499-associated LCSC 문서와 충돌합니다. 이 모델은 **LCSC에 직접 연결된 A3 2017-05-16 문서**만 pin하고 다른 mirror의 숫자를 합치지 않습니다. 동일 source의 current-dependence curve를 이번 PR에서 확인하지 못했으므로 Vf는 2.6–3.2V의 midpoint 2.9V를 명시적 table-only 가정으로 사용하고, 광도 350mcd는 정확히 5mA/25°C 시험점에서만 반환합니다.
 
 R/G/B/YG/Y/O의 데이터시트 광도는 min/max bin 범위이고 단일 typ 절대광도가 아닙니다. 상대 광도 곡선은 보관하더라도 그 범위를 임의의 midpoint “typ mcd”로 바꾸지 않으며, 현재 UI의 scalar mcd 출력은 `null`입니다. 추후 bin 선택/범위 출력 UI를 별도 구현할 수 있습니다.
 

@@ -4,11 +4,17 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright,expect
 ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'test-results';OUT.mkdir(exist_ok=True);ATLAS=OUT/'topologies';ATLAS.mkdir(exist_ok=True)
 URL='http://127.0.0.1:4173/led-tr-analyzer/';INLINE=os.environ.get('BROWSER_INLINE')=='1';server=None if INLINE else subprocess.Popen(['npm','run','preview','--','--host','127.0.0.1','--port','4173','--strictPort'],cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.STDOUT,start_new_session=True)
-errors=[];checks=0
-def check(c,m):
+errors=[];checks=0;scenario_checks={};current='BASE'
+def scenario(sid):
+ # Tag following checks with an acceptance scenario ID from docs/ACCEPTANCE.md (BASE = pre-matrix coverage).
+ global current
+ current=sid;scenario_checks.setdefault(sid,0)
+def tick():
  global checks
+ checks+=1;scenario_checks[current]=scenario_checks.get(current,0)+1
+def check(c,m):
  if not c: raise AssertionError(m)
- checks+=1
+ tick()
 try:
  for _ in range(0 if INLINE else 100):
   if server.poll() is not None: raise RuntimeError('Preview server terminated')
@@ -28,6 +34,7 @@ try:
     page.set_content('<html lang="ko"><head><meta charset="UTF-8"></head><body><div id="root"></div></body></html>');page.add_style_tag(content=next((ROOT/'dist/assets').glob('*.css')).read_text());page.add_script_tag(type='module',content=next((ROOT/'dist/assets').glob('*.js')).read_text())
    else: page.goto(URL,wait_until='networkidle')
   load();expect(page.get_by_role('heading',name='LED-TR Analyzer',exact=True)).to_be_visible();expect(page.locator('.schematic')).to_be_visible();check(page.locator('#topology option').count()==len(catalog),'all topology choices')
+  scenario('G09')
   for t in catalog:
    page.locator('#topology').select_option(t['id']);expect(page.locator('.schematic')).to_have_attribute('data-topology',t['id']);check(page.locator('.schem-part').count()>=2,t['id']+' renders semantic parts')
    rendered=set(page.locator('.schematic [data-instance-id]').evaluate_all('(nodes)=>nodes.map(n=>n.getAttribute("data-instance-id"))'))
@@ -38,12 +45,13 @@ try:
     # Direct high-side / GPIO sink OFF can only be asserted by this reduced model when VLED and GPIO domains match.
     match_domain=t['id'] in ['gpio-sink','pnp-high','pmos-high']
     if match_domain: page.locator('#vcc').fill('3.3')
-    page.locator('#state').select_option('HIGH' if t['active']=='LOW' else 'LOW');expect(page.locator('.quick-results')).to_contain_text('0 mA');checks+=1
+    page.locator('#state').select_option('HIGH' if t['active']=='LOW' else 'LOW');expect(page.locator('.quick-results')).to_contain_text('0 mA');tick()
     if match_domain: page.locator('#vcc').fill('5')
+  scenario('BASE')
   page.locator('#topology').select_option('gpio-source');page.locator('#state').select_option('LOW');expect(page.locator('.schematic-head')).to_contain_text('요청 LOW');check('GPIO HIGH' not in page.locator('.schematic').inner_text(),'source state not hard-coded HIGH')
   page.locator('#topology').select_option('gpio-sink');page.locator('#state').select_option('HIGH');expect(page.locator('.schematic-head')).to_contain_text('요청 HIGH');check('GPIO LOW' not in page.locator('.schematic').inner_text(),'sink state not hard-coded LOW')
   # At the default 5V LED / 3.3V GPIO domains, OFF is deliberately not claimed without injection/5V-tolerance modeling.
-  expect(page.locator('.quick-error')).to_contain_text('현재 조건 계산 불가');checks+=1
+  expect(page.locator('.quick-error')).to_contain_text('현재 조건 계산 불가');tick()
   page.locator('#topology').select_option('npn-pnp');check(page.locator('[data-instance-id="Q1"]').count()>0 and page.locator('[data-instance-id="Q2"]').count()>0,'compound Q1/Q2 visible')
   page.locator('#topology').select_option('npn-low');check(page.locator('#model-Q1 option').count()>=2,'NPN has selectable real parts');base_current=page.locator('.quick-results .metric').first.locator('strong').inner_text();page.locator('#model-Q1').select_option('nexperia:BC847B');expect(page.locator('.schematic [data-instance-id="Q1"]')).to_contain_text('BC847B');check(page.locator('.quick-results .metric').first.locator('strong').inner_text()!=base_current or page.locator('#model-Q1').input_value()=='nexperia:BC847B','NPN selection applied')
   # Interactive schematic is usable without hover.
@@ -56,10 +64,11 @@ try:
   check(report['schemaVersion']==3 and q1['modelId']=='nexperia:BC847B' and report['optical'] is not None,'export preserves exact selected Q1 model')
   page.locator('#topology').select_option('nmos-low');check(page.locator('#model-Q1 option').count()>=2,'NMOS has selectable real parts');page.locator('#model-Q1').select_option('nexperia:BSS138BKW');expect(page.locator('.schematic [data-instance-id="Q1"]')).to_contain_text('BSS138BKW')
   page.locator('#led').select_option('KT-0805R');page.locator('#temperature').fill('50');expect(page.locator('.schematic')).to_be_visible();check(page.get_by_text('화면을 표시하지 못했습니다').count()==0,'KT temperature does not trigger ErrorBoundary');page.locator('#temperature').fill('25')
-  page.locator('#topology').select_option('npn-low');page.locator('#baseResistance').fill('');page.locator('#topology').select_option('resistor');expect(page.get_by_role('heading',name='동작점',exact=True)).to_be_visible();checks+=1
+  page.locator('#topology').select_option('npn-low');page.locator('#baseResistance').fill('');page.locator('#topology').select_option('resistor');expect(page.get_by_role('heading',name='동작점',exact=True)).to_be_visible();tick()
   page.get_by_role('button',name='전체 초기화',exact=True).click();page.get_by_role('button',name='목표에서 저항 선정',exact=True).click();page.locator('#series').select_option('E96');page.locator('#strategy').select_option('bright');page.get_by_role('button',name='전체 초기화',exact=True).click();page.get_by_role('button',name='목표에서 저항 선정',exact=True).click();check(page.locator('#series').input_value()=='E24+E96' and page.locator('#strategy').input_value()=='closest','full reset resets sizing options')
-  apply_button=page.get_by_role('button',name='검증 모드에 적용',exact=True);expect(apply_button).to_be_visible();apply_button.click();expect(page.locator('#resistance')).to_be_visible();checks+=1
-  page.get_by_role('button',name='현재 조건 분석',exact=True).click();expect(page.locator('.corner-results')).to_be_visible();checks+=1
+  apply_button=page.get_by_role('button',name='검증 모드에 적용',exact=True);expect(apply_button).to_be_visible();apply_button.click();expect(page.locator('#resistance')).to_be_visible();tick()
+  page.get_by_role('button',name='현재 조건 분석',exact=True).click();expect(page.locator('.corner-results')).to_be_visible();tick()
+  scenario('G04')
   # Independent mA / mcd target drafts and KT optical inverse.
   page.get_by_role('button',name='전체 초기화',exact=True).click()
   page.get_by_role('button',name='목표에서 저항 선정',exact=True).click()
@@ -72,13 +81,14 @@ try:
   check(page.locator('#targetMa').input_value()=='12','mA goal draft preserved')
   page.locator('#target-kind').select_option('mcd')
   check(page.locator('#targetMcd').input_value()=='20','mcd goal draft preserved')
-  expect(page.locator('.design-goal')).to_be_visible();checks+=1
+  expect(page.locator('.design-goal')).to_be_visible();tick()
   page.locator('#led').select_option('KT-0805W')
   check(page.locator('#target-kind').input_value()=='current' and page.locator('#targetMa').input_value()=='12','unsupported optical fallback keeps original mA target')
   expect(page.get_by_text('이전 mcd 입력값은 보존했습니다.')).to_be_visible()
   page.locator('#led').select_option('KT-0805R')
   page.locator('#target-kind').select_option('mcd')
   check(page.locator('#targetMcd').input_value()=='20','mcd draft survives unsupported LED')
+  scenario('G10')
   page.get_by_role('button',name='저항으로 검증',exact=True).click()
   for field,value in [('resistorRating','0.125'),('auxRating','0.1'),('derating','0.7'),('ambient','25')]:
    page.locator('#'+field).fill('')
@@ -86,12 +96,13 @@ try:
    expect(page.locator('.quick-error')).to_be_visible()
    page.locator('#'+field).fill(value)
    expect(page.get_by_role('heading',name='동작점',exact=True)).to_be_visible()
-   checks+=1
+   tick()
   page.locator('#topology').select_option('nmos-pmos')
   for instance in ['RGS_IN','RGS_OUT']:
    page.locator('.schematic [data-instance-id="'+instance+'"]').click()
    expect(page.locator('.inspector')).to_have_attribute('data-inspector-id',instance)
-   checks+=1
+   tick()
+  scenario('BASE')
   page.locator('#topology').select_option('npn-low')
   page.locator('#model-GPIO1').select_option('assumed:DC-Thevenin')
   page.locator('#vdd').fill('5')
@@ -99,24 +110,26 @@ try:
   check(page.locator('.quick-error').count()==0,'assumed 5V source supports DC scenario')
   page.get_by_role('button',name='전체 초기화',exact=True).click()
   page.locator('#resistance').fill('220')
+  scenario('G07')
   page.locator('#resistorRating').fill('0.0625')
   page.get_by_role('button',name='현재 조건 분석',exact=True).click()
   expect(page.locator('.corner-results')).to_be_visible()
   expect(page.locator('.design-state-grid')).to_contain_text('초과 조건 있음')
   check(page.locator('.design-warnings .design-alert').count()>0,'sample violation details visible')
   page.screenshot(path=str(OUT/'desktop.png'),full_page=True)
+  scenario('G14')
   page.set_viewport_size({'width':390,'height':844});load();expect(page.locator('.schematic')).to_be_visible();check(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'no page horizontal overflow');check(page.locator('.schematic-scroll').evaluate('(e)=>e.scrollWidth>=e.clientWidth'),'schematic can use local 2D scroll')
-  expect(page.locator('#topology-mobile')).to_be_visible();page.locator('#topology-mobile').select_option('gpio-source');expect(page.locator('.schematic')).to_have_attribute('data-topology','gpio-source');checks+=1
+  expect(page.locator('#topology-mobile')).to_be_visible();page.locator('#topology-mobile').select_option('gpio-source');expect(page.locator('.schematic')).to_have_attribute('data-topology','gpio-source');tick()
   led_center=page.locator('.schematic [data-instance-id="LED1"]').evaluate('(el)=>{const r=el.getBoundingClientRect();return r.left+r.width/2}')
   check(led_center>60 and led_center<360,'mobile initially centers essential LED symbol: '+str(led_center))
-  expect(page.locator('.schematic-panel .design-summary')).to_be_visible();checks+=1
+  expect(page.locator('.schematic-panel .design-summary')).to_be_visible();tick()
   mobile_box=page.locator('.schematic').bounding_box();check(mobile_box is not None and mobile_box['y']<844,'schematic access begins within first mobile viewport: '+str(mobile_box))
   page.screenshot(path=str(OUT/'mobile.png'),full_page=True)
   # SVG screen-space font size: viewBox units scaled by CTM. Small labels target >=12 CSS px.
   min_px=page.locator('.schematic svg').evaluate("""svg=>{const m=svg.getScreenCTM();const s=Math.abs(m.a);return Math.min(...[...svg.querySelectorAll('text')].map(t=>(parseFloat(getComputedStyle(t).fontSize)||12)*s))}""")
   check(min_px>=11.5,'schematic text remains readable: '+str(min_px))
   check(not errors,'browser errors: '+str(errors));browser.close()
- print(json.dumps({'mode':'inline-artifact' if INLINE else 'http-pages-subpath','checks':checks,'topologies':len(catalog),'browser_errors':errors},ensure_ascii=False))
+ print(json.dumps({'mode':'inline-artifact' if INLINE else 'http-pages-subpath','checks':checks,'scenarios':scenario_checks,'topologies':len(catalog),'browser_errors':errors},ensure_ascii=False))
 finally:
  if server:
   os.killpg(server.pid,signal.SIGTERM)

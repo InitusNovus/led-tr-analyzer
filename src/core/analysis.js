@@ -41,7 +41,7 @@ export function checkLimits(point) {
         if(p.thermalResistance)limit=Math.min(limit??Infinity,(p.limits.maxJunction-c.ambient)/p.thermalResistance);
         else if(p.limits.deratePerC)limit=p.limits.power-p.limits.deratePerC*Math.max(0,c.ambient-25);
         else if(c.ambient>25)limit=null;
-        add(q.id+' power budget',id,'transistor-power-budget','power','W',q.power,limit==null?null:Math.max(0,limit),p.thermalCondition??'Reference lands at25°C; no derived thermal impedance');
+        add(q.id+' power budget',id,'transistor-power-budget','power','W',q.power,limit==null?null:Math.max(0,limit),p.thermalCondition??'Reference lands at 25°C; no derived thermal impedance');
     }
     const exceeded=checks.filter(x=>x.status==='exceeded'),unknown=checks.filter(x=>x.status==='unknown');
     return{checks,status:exceeded.length?'limits-exceeded':unknown.length?'unverified-limits':'within-entered-limits',
@@ -109,4 +109,3 @@ export function selectResistance(input,targetCurrent,{series='E24+E96',strategy=
     return{exact,selected,targetCurrent:target,result,goal,
         note:'선택된 표준 저항으로 실제 전류·광도 목표 달성 여부를 다시 계산했습니다. 표본/제조 편차의 보증은 아닙니다.'};
 }
-import * as opticalFunctions from './devices.js';
