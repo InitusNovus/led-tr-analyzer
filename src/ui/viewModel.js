@@ -126,3 +126,13 @@ export const goalVerdict = g => g.status === 'unavailable' ? '현재 구성에�
     : g.criterion === 'approximate' ? (g.met ? '목표 ±' + g.tolerancePct + '% 이내' : '허용 오차 ±' + g.tolerancePct + '% 밖')
     : (g.met ? '최소 목표 이상 충족' : '최소 목표 미달');
 
+/** Lifecycle of the sampled sensitivity result for the current inputs; never inferred from stale data. */
+export const cornerPhase = ({ hasPoint, corners, hasSnapshot, stale, running }) =>
+    !hasPoint ? 'unavailable'
+    : corners ? (corners.error ? 'error' : corners.failures?.length ? 'partial' : 'complete')
+    : running ? 'running'
+    : (hasSnapshot || stale) ? 'stale' : 'idle';
+export const CORNER_PHASE_TEXT = {
+    unavailable: '동작점 미계산', idle: '미실행', running: '계산 중…', stale: '입력 변경됨 · 다시 실행 필요',
+    error: '분석 실패', partial: '일부 조건 미지원', complete: '완료',
+};

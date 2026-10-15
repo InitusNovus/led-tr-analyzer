@@ -1,13 +1,15 @@
-import React,{useMemo,useReducer}from'react';
+import React,{useEffect,useMemo,useReducer,useRef,useState}from'react';
 import{ArrowLeft,Download,ExternalLink,RotateCcw,Zap,ChevronRight}from'lucide-react';
 import{TOPOLOGIES,topologyById,topologyUsesGPIO}from'./core/topologies.js';
 import{designReducer,initialDesignState}from'./ui/designState.js';
+import{startCornerRun}from'./ui/cornerRunner.js';
 import{analyzePoint,analyzeCorners,selectResistance}from'./core/analysis.js';
 import{evaluateGoal,goalDrift,intentFromGoal}from'./core/goal.js';
 import{LEDS,SOURCES,PACKAGE_PRESETS,modelsForFamily,getDeviceModel}from'./data/catalog.js';
-import{selectedParts,partEvidence,opticalEvidence,buildInstanceViews,goalVerdict}from'./ui/viewModel.js';
+import{selectedParts,partEvidence,opticalEvidence,buildInstanceViews,goalVerdict,cornerPhase}from'./ui/viewModel.js';
 import CircuitDiagram from'./components/CircuitDiagram.jsx';
 import DesignSummary from './components/DesignSummary.jsx';
+import{SensitivityWitness}from'./components/SensitivitySummary.jsx';
 import QuickSpecs from './components/QuickSpecs.jsx';
 import { opticalCapability } from './core/optics.js';
 import'./index.css';
@@ -67,11 +69,11 @@ function Inspector({view}){
 }
 export default function App(){
  const[state,dispatch]=useReducer(designReducer,undefined,initialDesignState);
- const{config,mode,targetMa,targetMcd,targetKind,opticalBasis,opticalNotice,series,strategy,criterion,tolerancePct,appliedGoal,cornerSnapshot,includeDtc,selectedInstance}=state;
+ const{config,mode,targetMa,targetMcd,targetKind,opticalBasis,opticalNotice,series,strategy,criterion,tolerancePct,appliedGoal,cornerSnapshot,cornersStale,includeDtc,selectedInstance}=state;
  const patch=(p,invalidate=false)=>dispatch({type:'patch',patch:p,invalidate});
  const setMode=v=>patch({mode:v}),setTargetMa=v=>patch({targetMa:v}),setTargetMcd=v=>patch({targetMcd:v}),
   setOpticalBasis=v=>patch({opticalBasis:v}),setSeries=v=>patch({series:v}),setStrategy=v=>patch({strategy:v}),
-  setCriterion=v=>patch({criterion:v}),setTolerancePct=v=>patch({tolerancePct:v}),setIncludeDtc=v=>patch({includeDtc:v}),setCornerSnapshot=v=>patch({cornerSnapshot:v}),setSelectedInstance=v=>patch({selectedInstance:v});
+  setCriterion=v=>patch({criterion:v}),setTolerancePct=v=>patch({tolerancePct:v}),setIncludeDtc=v=>patch({includeDtc:v}),setCornerSnapshot=v=>dispatch({type:'corners',snapshot:v}),setSelectedInstance=v=>patch({selectedInstance:v});
  const t=topologyById(config.topology),led=LEDS[config.led],optical=opticalEvidence(led);
  const set=(key,value)=>dispatch({type:'config',key,value});
  const setDevice=(id,value)=>dispatch({type:'device',id,value});
@@ -87,6 +89,23 @@ export default function App(){
    }catch(e){return{ok:false,error:{code:e.code??'calculation-error',message:e.message}};}
  },[config,mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy,criterion,tolerancePct]);
  const p=result.ok?result.point:null,applied=p?.config??null,configKey=JSON.stringify({applied,mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy,includeDtc}),corners=cornerSnapshot&&p&&cornerSnapshot.key===configKey?cornerSnapshot.result:null;
+ // The default 81-scenario run is cheap (~20-40 ms), so it follows the inputs after a short debounce.
+ // The extended DTC sweep (729 scenarios, ~170 ms) stays a manual action.
+ // Runs are time-boxed (see cornerRunner) because some topologies need ~4 ms per scenario.
+ const[cornerProgress,setCornerProgress]=useState(null),[manualRunning,setManualRunning]=useState(false),manualCancel=useRef(null);
+ const autoCorners=!includeDtc,phase=cornerPhase({hasPoint:!!p,corners,hasSnapshot:cornerSnapshot!==null,stale:cornersStale,running:(autoCorners&&!corners)||manualRunning});
+ const runCorners=(opts,done)=>startCornerRun(p.config,{...opts,onProgress:setCornerProgress,
+   onDone:r=>{setCornerProgress(null);done();setCornerSnapshot({key:configKey,result:r});},
+   onError:e=>{setCornerProgress(null);done();setCornerSnapshot({key:configKey,result:{error:e.message}});}});
+ useEffect(()=>{
+   if(!p||!autoCorners||corners)return;
+   let cancel=()=>{};
+   const timer=setTimeout(()=>{cancel=runCorners({includeDtc:false},()=>{});},250);
+   return()=>{clearTimeout(timer);cancel();setCornerProgress(null);};
+ },[configKey,autoCorners,!!p,!!corners]);
+ useEffect(()=>()=>{manualCancel.current?.();manualCancel.current=null;setManualRunning(false);setCornerProgress(null);},[configKey]);
+ const runManual=()=>{if(!p)return;manualCancel.current?.();setManualRunning(true);
+   manualCancel.current=runCorners({includeDtc},()=>{manualCancel.current=null;setManualRunning(false);});};
  const parts=selectedParts(config,t),views=buildInstanceViews(applied??config,p,result.ok?result.validation:null),activeSelected=selectedInstance,selectedView=views.find(v=>v.instanceId===selectedInstance)??null;
  const reset=()=>dispatch({type:'reset'});
  // size mode: the goal being edited; verify mode: the applied goal, re-judged against the live operating point.
@@ -123,7 +142,7 @@ export default function App(){
     <div className="quick-results">{p?<><Metric label="LED 전류" value={show(p.current,1000,'mA')} hint={p.region}/><Metric label="LED Vf / 개" value={show(p.ledVf,1,'V')}/>{topologyUsesGPIO(t)&&<Metric label="GPIO 전류" value={show(p.gpioCurrent,1000,'mA')} hint="+ source / − sink"/>}<Metric label="Driver 손실" value={show(p.driverPower,1000,'mW')}/></>:<div className="quick-error"><strong>현재 조건 계산 불가</strong><span>{result.error?.message}</span></div>}</div>
     <Inspector view={selectedView}/>
     <DesignSummary config={p?.config??config} point={p} validation={result.ok?result.validation:null}
-     corners={corners} mode={mode} goal={goalView} onInspect={setSelectedInstance}/>
+     corners={corners} cornerPhase={phase} cornerProgress={cornerProgress} mode={mode} goal={goalView} onInspect={setSelectedInstance}/>
    </div>
   </section>
 
@@ -231,8 +250,10 @@ export default function App(){
       </div>
       <p className="subtle">E-series는 표준값 계열이며 실제 부품 공차와 독립입니다.</p>
      {q1?.family==='digital-npn'&&<label className="check"><input id="include-dtc" type="checkbox" checked={includeDtc} onChange={e=>{setIncludeDtc(e.target.checked);setCornerSnapshot(null);}}/> Q1 R1 및 R2/R1 공차 포함</label>}
-     <button className="primary" disabled={!p} onClick={()=>{try{setCornerSnapshot({key:configKey,result:analyzeCorners(p.config,{includeDtc})});}catch(e){setCornerSnapshot({key:configKey,result:{error:e.message}});}}}>현재 조건 분석</button>
-     {corners&&(corners.error?<p role="alert">{corners.error}</p>:<div className="corner-results"><p>{corners.validCount}/{corners.count} 조건 계산 · {corners.failures.length}개 미지원/실패 · {corners.anyExceeded?'한계 초과 조건 있음':'계산 가능한 표본의 검사 완료'}</p>{Object.entries(corners.extrema).map(([metric,e])=>e&&<details key={metric}><summary>{metric}: {show(e.min.value,metric==='current'?1000:1000)} – {show(e.max.value,1000)} {metric==='current'?'mA':'mW'}</summary><pre>{JSON.stringify({minimum:e.min.scenario,maximum:e.max.scenario},null,2)}</pre></details>)}</div>)}
+     <button className="primary" disabled={!p||manualRunning} onClick={runManual}>{manualRunning?'분석 중…':'현재 조건 분석'}</button>
+     <p className="subtle">{autoCorners?'기본 표본(공차 축 곱)은 입력이 멈추면 자동으로 계산합니다. 버튼은 다시 실행할 때 씁니다.':'DTC 내부 공차를 포함한 확장 분석은 느리므로 직접 실행합니다.'}</p>
+     {corners&&(corners.error?<p role="alert">{corners.error}</p>:<div className="corner-results"><p>{corners.validCount}/{corners.count} 조건 계산 · {corners.failures.length}개 미지원/실패 · {corners.failures.length?'일부 조건 제외됨':corners.anyExceeded?'한계 초과 조건 있음':'계산한 표본의 검사 완료'}</p>
+       <SensitivityWitness corners={corners} point={p} config={p.config}/></div>)}
     </section>
     <section className="panel"><h2>선택 부품의 데이터 근거</h2><div className="evidence-grid">{parts.map(({instanceId,role,modelId,part})=>{const ev=partEvidence(part),src=ev?.source;return<article className="evidence-card" key={instanceId}><div><b>{instanceId}</b><span>{role}</span></div><strong>{part.name??part.id}</strong><small>{ev?.modelKind}</small>{src&&(src.url?<a href={src.url} target="_blank" rel="noreferrer">{src.manufacturer} · {src.revision} <ExternalLink size={12}/></a>:
    <span>{src.manufacturer} · 제조사 정격 없음</span>)}<p>{part.notes?.[0]??'등록된 모델 데이터'}</p></article>;})}</div></section>

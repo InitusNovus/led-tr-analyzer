@@ -1,6 +1,7 @@
 import React from 'react';
 import { PACKAGE_PRESETS } from '../data/catalog.js';
-import { GOAL_BASIS_LABEL, goalVerdict } from '../ui/viewModel.js';
+import { GOAL_BASIS_LABEL, goalVerdict, CORNER_PHASE_TEXT } from '../ui/viewModel.js';
+import { SensitivityRibbon } from './SensitivitySummary.jsx';
 
 const amount=(v,scale=1,unit='')=>v==null||!Number.isFinite(v)?'—':(v*scale).toLocaleString('en-US',{maximumSignificantDigits:4})+(unit?' '+unit:'');
 const formatCheck=c=>amount(c.actual,c.unit==='A'?1000:c.unit==='W'?1000:1,c.unit==='A'?'mA':c.unit==='W'?'mW':c.unit??'');
@@ -95,22 +96,20 @@ function GoalSummary({goal}){
   {optical&&<small>광도 목표는 제조사 보증이 아니라 전형적 상대곡선에 기반한 bin 추정입니다.</small>}
  </div>;
 }
-export default function DesignSummary({config,point,validation,corners,mode,goal,onInspect}){
- const sampleState=corners?(corners.error?'분석 실패':corners.failures?.length?'일부 조건 미지원':corners.anyExceeded?'초과 조건 있음':'입력한 표본 내'):'미실행';
+export default function DesignSummary({config,point,validation,corners,cornerPhase,cornerProgress,mode,goal,onInspect}){
+ const sampleState=cornerPhase==='complete'?(corners.anyExceeded?'초과 조건 있음':'입력한 표본 내')
+   :cornerPhase==='partial'?'일부 조건 미지원'+(corners.anyExceeded?' · 초과 조건 있음':''):CORNER_PHASE_TEXT[cornerPhase??'idle'];
  return <section className="panel design-summary" aria-label="설계 판단 요약">
   <h2>설계 판단 요약</h2>
   <div className="design-state-grid">
    <div><small>Nominal 정격 검사</small><strong>{validation?.label??'동작점 미계산'}</strong></div>
    <div><small>Sampled sensitivity</small><strong>{sampleState}</strong><span>{corners?.count!=null?corners.validCount+'/'+corners.count+'개 계산':''}</span></div>
   </div>
+  <SensitivityRibbon point={point} corners={corners} phase={cornerPhase??'idle'} progress={cornerProgress}/>
   {goal&&<GoalSummary goal={goal}/>}
   <OpticalResult optical={point?.optical}/>
   <VoltagePath config={config} point={point}/>
   <PowerUsage config={config} point={point} corners={corners}/>
   <WarningSummary point={point} validation={validation} corners={corners} onInspect={onInspect}/>
-  {corners?.opticalRange&&Number.isFinite(corners.opticalRange.min)&&
-   <p className="subtle">전기적 sampled 조건과 광도 bin 범위를 결합한 추정:
-    {amount(corners.opticalRange.min,1,'mcd')} … {amount(corners.opticalRange.max,1,'mcd')} (확률·제조 보증 아님)
-   </p>}
  </section>;
 }

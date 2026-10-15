@@ -73,6 +73,11 @@ CI는 Node24에서 lockfile을 이용해 설치하고 위 경로를 실행합니
 - 계산 실패 중에도 정적 instance 유지, Q1.R1/2 및 RGS_IN/OUT canonical 식별
 - `checkLimits`가 ruleId/instanceId/unit/scope를 포함하고 같은 inspector에 연결
 - nominal 통과 + sampled 초과를 같은 설계 요약에서 **범위를 구별해** 표시
+- 기본 설계에서 nominal 전류와 sampled 최소·최대가 같은 요약에 표시되고, 값이 극값 witness 시나리오로 재현되는지 확인 (`tests/sensitivity.test.js`)
+- 스윕한 축과 스윕하지 않은 조건(RB/RE, 온도, 전형 곡선, DTC 내부 공차)이 결과에 함께 나오는지 확인
+- 일부 조건이 모델 적용범위 밖(예: GPIO VDD 3.5V ±5%)이면 `partial`로 제외 개수와 이유를 표시하고 전체 통과 문구가 나오지 않는지 확인
+- 입력 변경 시 이전 sampled 결과를 현재 값처럼 보이지 않고(`stale`), 계산 중·실패·미실행을 구별하는지 확인
+- 광도 bin 범위, 전기 조건 변동만, 결합 추정이 서로 다른 값으로 표시되는지 확인
 - 별도의 사용자 가정 5V 제어원과 실제 STM32 GPIO 제한을 구분
 - 모바일에서 핵심 회로 소자가 가로 스크롤 초기 위치에 보이는지 확인
 - JSON v4 export에서 exact 부품 model ID, 독립 목표값, structured optical 결과, 적용한 목표와 구성 snapshot, 화면과 같은 판정을 확인

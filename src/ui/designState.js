@@ -15,12 +15,14 @@ export function initialDesignState() {
         series: 'E24+E96', strategy: 'closest',
         // Editing-time judgement rule vs. the goal the user actually applied to verify mode.
         criterion: 'minimum', tolerancePct: DEFAULT_GOAL_TOLERANCE_PCT, appliedGoal: null,
-        includeDtc: false, cornerSnapshot: null, selectedInstance: 'Q1',
+        // cornersStale: a sampled result existed but an input changed since (distinct from 'never run').
+        includeDtc: false, cornerSnapshot: null, cornersStale: false, selectedInstance: 'Q1',
     };
 }
 const defaultSelection = topology => topology.deviceSlots.some(s => s.id === 'Q1') ? 'Q1' : 'LED1';
 /** Changing any electrical input makes a previous sampled-corner result stale. */
-const withConfig = (state, config, extra = {}) => ({ ...state, ...extra, config, cornerSnapshot: null });
+const staleFlag = state => state.cornerSnapshot !== null || state.cornersStale;
+const withConfig = (state, config, extra = {}) => ({ ...state, ...extra, config, cornerSnapshot: null, cornersStale: staleFlag(state) });
 
 export function designReducer(state, action) {
     switch (action.type) {
@@ -47,7 +49,9 @@ export function designReducer(state, action) {
         }
         case 'targetKind':
             if (action.kind === 'mcd' && !opticalCapability(LEDS[state.config.led]).canInvert) return state;
-            return { ...state, cornerSnapshot: null, targetKind: action.kind, opticalNotice: '' };
+            return { ...state, cornerSnapshot: null, cornersStale: staleFlag(state), targetKind: action.kind, opticalNotice: '' };
+        case 'corners':
+            return { ...state, cornerSnapshot: action.snapshot, cornersStale: action.snapshot ? false : staleFlag(state) };
         case 'applyGoal': {
             // Keeps the intent and the configuration it was applied to; verify mode re-evaluates against the live point.
             const config = { ...state.config, resistance: action.selectedResistance };
@@ -60,7 +64,7 @@ export function designReducer(state, action) {
         case 'reset':
             return initialDesignState();
         case 'patch':
-            return { ...state, ...action.patch, ...(action.invalidate ? { cornerSnapshot: null } : {}) };
+            return { ...state, ...action.patch, ...(action.invalidate ? { cornerSnapshot: null, cornersStale: staleFlag(state) } : {}) };
         default:
             return state;
     }
