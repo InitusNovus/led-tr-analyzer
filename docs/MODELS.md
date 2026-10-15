@@ -155,4 +155,26 @@ Iv_max_est(I) = Iv_max(I_test) * scale(I)
 
 Nominal 검사와 `analyzeCorners()`의 sampled extrema 및 위반 witness는 **서로 다른 scope**이며, sampled에서 일부 실패한 경우 전체 범위가 검증된 것으로 표시하지 않습니다. Optical bin range(동일 전류의 광학 범위)와 optical sampled range(여러 전기 조건으로 달라진 범위)도 별도의 개념입니다. 독립 광도/mA 목표 draft를 저장하므로 단위를 바꾸거나 미지원 LED로 전환해도 숫자를 잘못 재사용하지 않습니다.
 
+### 감도 분석 실행 정책과 응답성
+
+`analyzeCorners()`는 `planCorners()`(시나리오 격자와 축 정보) → `evaluateCorner()`(시나리오 1개) → `summarizeCorners()`(극값·위반·광도 범위)로 나뉘고, 한 번에 실행해도 같은 결과를 냅니다. 화면은 `src/ui/cornerRunner.js`가 약 12ms 단위로 UI 스레드를 양보하며 실행하고, 입력이 바뀌면 취소합니다.
+
+- **기본 표본**(VLED·GPIO 전원·RLED·Vf 이동 각 3점, 최대 81개)은 입력이 250ms 멈추면 자동으로 계산합니다.
+- **DTC 확장**(R1 배율·R2/R1 추가, 729개)은 직접 실행합니다.
+- 결과 상태는 `unavailable`(동작점 없음) · `idle`(미실행) · `running`(계산 중, 진행률 표시) · `stale`(입력이 바뀌어 무효, 수동 모드) · `error` · `partial`(일부 조건 제외) · `complete`입니다. 이전 입력의 결과는 현재 값처럼 표시하지 않습니다.
+- 결과에는 스윕한 축(`axes.swept`)과 공칭값으로 둔 조건(`axes.fixed`)이 들어 있어 Min/Max를 보증 worst case로 읽지 않게 합니다. 광도는 `opticalSpread`로 bin 범위(공칭 전류), 전기 조건 변동만(대표값 기준), 둘을 결합한 추정을 분리합니다.
+
+**측정** (`node scripts/measure_sensitivity.mjs`, `python scripts/measure_ui_stall.py`; 이 개발 환경의 값이며 기기마다 다릅니다). 시나리오당 비용은 토폴로지마다 크게 다릅니다.
+
+| 구성 | 시나리오 | 한 번에 계산 (중앙값) |
+|---|---|---|
+| 저항 직결 | 27 | 약 2ms |
+| GPIO / digital NPN / NMOS / PMOS | 81 | 약 5–15ms |
+| NPN 로우사이드 / PNP 하이사이드 / 레벨 시프트 | 81 | 약 17–39ms |
+| **NPN 에미터 팔로워** | 81 | **약 240ms** |
+| **NPN 에미터 저항 전류 싱크** | 81 | **약 380ms** |
+| digital NPN + DTC 확장 | 729 | 약 110ms |
+
+한 번에 동기 계산하면 에미터 팔로워·전류 싱크에서 입력을 멈출 때마다 UI가 0.25–0.35초 멈췄습니다(브라우저 측정: 최악 정지 254ms / 349ms). 시간 예산 방식으로 바꾼 뒤 같은 조작의 최악 정지는 약 33ms / 32ms(digital NPN은 38ms → 16ms)입니다.
+
 모든 모드에서 정격 입력은 계산 결과 조건문 밖에서 렌더링하고, 빈칸은 0으로 강제 대체하지 않고 필드 오류 및 유효하지 않은 계산 상태로 취급합니다. JSON `schemaVersion:3`에서 `designIntent`과 `optical` 구조화 근거를 내보냅니다.

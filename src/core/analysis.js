@@ -1,8 +1,8 @@
 import { ModelError, finite, bisect, standardResistor, unique } from './math.js';
-import { normalizeConfig, solvePoint, topologyById, topologyUsesGPIO } from './topologies.js';
+import { normalizeConfig, solvePoint, topologyById, topologyUsesGPIO, activeParameterNames } from './topologies.js';
 import { LEDS, getDeviceModel } from '../data/catalog.js';
 import { context, sample } from './devices.js';
-import { solveOpticalCurrent, opticalCapability } from './optics.js';
+import { solveOpticalCurrent, opticalCapability, opticalValueForBasis } from './optics.js';
 import { evaluateGoal, normalizeCriterion } from './goal.js';
 /** Canonical validation IDs are independent from translated user-facing labels. */
 export function checkLimits(point) {
@@ -52,7 +52,21 @@ export function analyzePoint(input){
     try{const point=solvePoint(input);return{ok:true,point,validation:checkLimits(point)};}
     catch(error){if(error instanceof ModelError)return{ok:false,error:{code:error.code,message:error.message}};throw error;}
 }
-export function analyzeCorners(input,{includeDtc=false}={}){
+const RESISTOR_PARAMETERS={baseResistance:'RB',emitterResistance:'RE',gateResistance:'RG',gatePull:'RGS',pullResistance:'GPIO pull',sourceResistance:'제어원 Rout'};
+/** What a sampled sensitivity run deliberately leaves at its nominal value, so Min/Max is never read as a full worst case. */
+function fixedSensitivityAxes(c,allAxes,{includeDtc,q1}){
+    const topology=topologyById(c.topology),sweptKeys=new Set(allAxes.filter(a=>a.values.length>1).map(a=>a.key)),fixed=[];
+    for(const name of activeParameterNames(topology,c))
+        if(RESISTOR_PARAMETERS[name]&&!sweptKeys.has(name))fixed.push({key:name,label:RESISTOR_PARAMETERS[name]+' 공칭값',value:c[name],unit:'Ω'});
+    if(q1?.family==='digital-npn'&&!includeDtc)fixed.push({key:'dtcTolerance',label:'Q1 내부 R1·R2/R1 공차 (확장 분석에서만 스윕)',value:null,unit:''});
+    fixed.push({key:'temperature',label:'전기 모델 온도',value:c.temperature,unit:'°C'},
+        {key:'device-curves',label:'LED·TR·GPIO 전형 곡선 (제조 편차 미반영)',value:null,unit:''});
+    for(const a of allAxes)if(a.values.length<2&&(a.key!=='vdd'||topologyUsesGPIO(topology)))
+        fixed.push({key:a.key,label:a.label+' (공차 0%로 고정)',value:a.nominal,unit:a.unit});
+    return fixed;
+}
+/** Scenario grid and axis metadata for a sampled run; separated from evaluation so a run can be chunked and cancelled. */
+export function planCorners(input,{includeDtc=false}={}){
     const c=normalizeConfig(input),axes=[
         ['vcc',unique([c.vcc*(1-c.vccTolerance/100),c.vcc,c.vcc*(1+c.vccTolerance/100)])],
         ['vdd',topologyUsesGPIO(topologyById(c.topology))?unique([c.vdd*(1-c.vddTolerance/100),c.vdd,c.vdd*(1+c.vddTolerance/100)]):[c.vdd]],
@@ -63,9 +77,20 @@ export function analyzeCorners(input,{includeDtc=false}={}){
     if(includeDtc&&q1?.family==='digital-npn'){
         axes.push(['dtcR1Scale',unique([q1.r1Range[0]/q1.r1,1,q1.r1Range[1]/q1.r1])],['dtcRatio',unique([q1.ratioRange[0],q1.ratio,q1.ratioRange[1]])]);
     }
+    const nominalOf={vcc:c.vcc,vdd:c.vdd,resistance:c.resistance,vfShift:c.vfShift,dtcR1Scale:1,dtcRatio:q1?.ratio};
+    const AXIS_LABEL={vcc:['VLED','V'],vdd:['GPIO 전원','V'],resistance:['RLED','Ω'],vfShift:['LED Vf 이동','V'],dtcR1Scale:['Q1 R1 배율','×'],dtcRatio:['Q1 R2/R1','']};
+    const allAxes=axes.map(([key,values])=>({key,label:AXIS_LABEL[key][0],unit:AXIS_LABEL[key][1],values,nominal:nominalOf[key]}));
+    const sweptAxes=allAxes.filter(a=>a.values.length>1),fixedAxes=fixedSensitivityAxes(c,allAxes,{includeDtc,q1});
     let scenarios=[{}];for(const[k,vs]of axes)scenarios=scenarios.flatMap(s=>vs.map(v=>({...s,[k]:v})));
-    const samples=[],failures=[];
-    for(const scenario of scenarios){const a=analyzePoint({...c,...scenario});if(a.ok)samples.push({scenario,point:a.point,validation:a.validation});else failures.push({scenario,error:a.error});}
+    return{config:c,includeDtc,scenarios,axes:{swept:sweptAxes,fixed:fixedAxes}};
+}
+export function evaluateCorner(plan,index){
+    const scenario=plan.scenarios[index],a=analyzePoint({...plan.config,...scenario});
+    return a.ok?{scenario,point:a.point,validation:a.validation}:{scenario,failure:{scenario,error:a.error}};
+}
+export function summarizeCorners(plan,outcomes){
+    const c=plan.config;
+    const samples=outcomes.filter(o=>!o.failure),failures=outcomes.filter(o=>o.failure).map(o=>o.failure);
     const extrema={};
     for(const metric of ['current','resistorPower','driverPower','inputPower']){
         if(!samples.length){extrema[metric]=null;continue;}
@@ -81,10 +106,28 @@ export function analyzeCorners(input,{includeDtc=false}={}){
        validCount:opticalAvailable.length,
        kind:'sampled-electrical-scenarios-plus-optical-bin-range'
     }:null;
-    return{kind:'sampled-sensitivity',count:scenarios.length,validCount:samples.length,failures,extrema,
+    const nominal=analyzePoint(c);
+    const typicalOf=o=>opticalValueForBasis(o,'typ')??opticalValueForBasis(o,'representative');
+    const electricalValues=opticalAvailable.map(s=>typicalOf(s.point.optical)).filter(Number.isFinite);
+    const nominalOptical=nominal.ok?nominal.point.optical:null;
+    // Bin spread (manufacturer test-point range at the nominal current) and the spread caused by the sampled electrical
+    // scenarios alone (one representative value per scenario) are different things; the combined range mixes both.
+    const opticalSpread={
+        binAtNominal:nominalOptical&&nominalOptical.kind!=='unavailable'&&Number.isFinite(nominalOptical.minMcd)&&Number.isFinite(nominalOptical.maxMcd)
+            ?{min:nominalOptical.minMcd,max:nominalOptical.maxMcd}:null,
+        electricalOnly:electricalValues.length?{min:Math.min(...electricalValues),max:Math.max(...electricalValues),
+            basis:Number.isFinite(opticalValueForBasis(opticalAvailable[0].point.optical,'typ'))?'typ':'representative'}:null,
+        combined:opticalRange,
+    };
+    return{kind:'sampled-sensitivity',count:plan.scenarios.length,validCount:samples.length,failures,extrema,
+        axes:plan.axes,opticalSpread,
         opticalRange,violations:violations.slice(0,30),violationCount:violations.length,
         anyExceeded:violations.length>0,
         flags:unique(samples.flatMap(s=>s.point.flags)),note:'Vf offset is user-assumed. Typical device curves are held fixed. Sampled extrema are not guaranteed process/thermal worst cases. RB/RE and auxiliary resistors are nominal; RLED tolerance is swept only.'};
+}
+export function analyzeCorners(input,opts){
+    const plan=planCorners(input,opts);
+    return summarizeCorners(plan,plan.scenarios.map((_,i)=>evaluateCorner(plan,i)));
 }
 export function selectResistance(input,targetCurrent,{series='E24+E96',strategy='closest',targetMcd=null,opticalBasis='auto',criterion='minimum',tolerancePct}={}){
     const goalRule=normalizeCriterion(criterion,tolerancePct);
