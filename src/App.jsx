@@ -3,8 +3,9 @@ import{ArrowLeft,Download,ExternalLink,RotateCcw,Zap,ChevronRight}from'lucide-re
 import{TOPOLOGIES,topologyById,topologyUsesGPIO}from'./core/topologies.js';
 import{designReducer,initialDesignState}from'./ui/designState.js';
 import{analyzePoint,analyzeCorners,selectResistance}from'./core/analysis.js';
+import{evaluateGoal,goalDrift,intentFromGoal}from'./core/goal.js';
 import{LEDS,SOURCES,PACKAGE_PRESETS,modelsForFamily,getDeviceModel}from'./data/catalog.js';
-import{selectedParts,partEvidence,opticalEvidence,buildInstanceViews}from'./ui/viewModel.js';
+import{selectedParts,partEvidence,opticalEvidence,buildInstanceViews,goalVerdict}from'./ui/viewModel.js';
 import CircuitDiagram from'./components/CircuitDiagram.jsx';
 import DesignSummary from './components/DesignSummary.jsx';
 import QuickSpecs from './components/QuickSpecs.jsx';
@@ -66,11 +67,11 @@ function Inspector({view}){
 }
 export default function App(){
  const[state,dispatch]=useReducer(designReducer,undefined,initialDesignState);
- const{config,mode,targetMa,targetMcd,targetKind,opticalBasis,opticalNotice,series,strategy,cornerSnapshot,includeDtc,selectedInstance}=state;
+ const{config,mode,targetMa,targetMcd,targetKind,opticalBasis,opticalNotice,series,strategy,criterion,tolerancePct,appliedGoal,cornerSnapshot,includeDtc,selectedInstance}=state;
  const patch=(p,invalidate=false)=>dispatch({type:'patch',patch:p,invalidate});
  const setMode=v=>patch({mode:v}),setTargetMa=v=>patch({targetMa:v}),setTargetMcd=v=>patch({targetMcd:v}),
   setOpticalBasis=v=>patch({opticalBasis:v}),setSeries=v=>patch({series:v}),setStrategy=v=>patch({strategy:v}),
-  setIncludeDtc=v=>patch({includeDtc:v}),setCornerSnapshot=v=>patch({cornerSnapshot:v}),setSelectedInstance=v=>patch({selectedInstance:v});
+  setCriterion=v=>patch({criterion:v}),setTolerancePct=v=>patch({tolerancePct:v}),setIncludeDtc=v=>patch({includeDtc:v}),setCornerSnapshot=v=>patch({cornerSnapshot:v}),setSelectedInstance=v=>patch({selectedInstance:v});
  const t=topologyById(config.topology),led=LEDS[config.led],optical=opticalEvidence(led);
  const set=(key,value)=>dispatch({type:'config',key,value});
  const setDevice=(id,value)=>dispatch({type:'device',id,value});
@@ -81,14 +82,23 @@ export default function App(){
  const result=useMemo(()=>{
    if(mode==='verify')return analyzePoint(config);
    try{const sizing=selectResistance(config,targetKind==='current'?targetMa/1000:.001,
-     {series,strategy,targetMcd:targetKind==='mcd'?targetMcd:null,opticalBasis});
+     {series,strategy,targetMcd:targetKind==='mcd'?targetMcd:null,opticalBasis,criterion,tolerancePct});
      return {...sizing.result,sizing};
    }catch(e){return{ok:false,error:{code:e.code??'calculation-error',message:e.message}};}
- },[config,mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy]);
+ },[config,mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy,criterion,tolerancePct]);
  const p=result.ok?result.point:null,applied=p?.config??null,configKey=JSON.stringify({applied,mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy,includeDtc}),corners=cornerSnapshot&&p&&cornerSnapshot.key===configKey?cornerSnapshot.result:null;
  const parts=selectedParts(config,t),views=buildInstanceViews(applied??config,p,result.ok?result.validation:null),activeSelected=selectedInstance,selectedView=views.find(v=>v.instanceId===selectedInstance)??null;
  const reset=()=>dispatch({type:'reset'});
- const exportResult=()=>{if(!p)return;const modelSnapshot=selectedParts(p.config,t).map(x=>({instanceId:x.instanceId,modelId:x.modelId,source:x.part.source,sourceRevision:SOURCES[x.part.source]?.revision??null,modelKind:x.part.modelKind??x.part.kind??null}));const report={schemaVersion:3,application:'LED-TR Analyzer',scope:'datasheet-based reduced DC model, not SPICE',inputDraft:config,designIntent:{mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy},appliedConfiguration:p.config,modelSnapshot,result,corners,optical:p.optical,goal:result.sizing?.goal??null,migrationNote:'v3 structured optical range and independent mA/mcd goals; v2 stored exact model IDs.'};const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='led-tr-analysis-v3.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ // size mode: the goal being edited; verify mode: the applied goal, re-judged against the live operating point.
+ const goalView=useMemo(()=>{
+   if(mode==='size')return result.sizing?.goal?{...result.sizing.goal,origin:'editing',drift:[]}:null;
+   if(!appliedGoal)return null;
+   return{...evaluateGoal(p,appliedGoal.intent),origin:'applied',selectedResistance:appliedGoal.selectedResistance,
+     exactResistance:appliedGoal.exactResistance,drift:goalDrift(appliedGoal.snapshot,config)};
+ },[mode,result,appliedGoal,p,config]);
+ const applyGoal=()=>dispatch({type:'applyGoal',intent:intentFromGoal(result.sizing.goal,{series,strategy}),
+   selectedResistance:result.sizing.selected,exactResistance:result.sizing.exact});
+ const exportResult=()=>{if(!p)return;const modelSnapshot=selectedParts(p.config,t).map(x=>({instanceId:x.instanceId,modelId:x.modelId,source:x.part.source,sourceRevision:SOURCES[x.part.source]?.revision??null,modelKind:x.part.modelKind??x.part.kind??null}));const report={schemaVersion:4,application:'LED-TR Analyzer',scope:'datasheet-based reduced DC model, not SPICE',inputDraft:config,designIntent:{mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy,criterion,tolerancePct},appliedConfiguration:p.config,modelSnapshot,result,corners,optical:p.optical,goal:goalView,editingGoal:result.sizing?.goal??null,appliedGoal:appliedGoal?{intent:appliedGoal.intent,selectedResistance:appliedGoal.selectedResistance,exactResistance:appliedGoal.exactResistance,configSnapshot:appliedGoal.snapshot,evaluation:evaluateGoal(p,appliedGoal.intent),drift:goalDrift(appliedGoal.snapshot,config)}:null,migrationNote:'v4 keeps the applied goal, its configuration snapshot and a live re-evaluation; v3 had only the sizing-time goal; v2 stored exact model IDs.'};const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='led-tr-analysis-v4.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  const number=(name,label,unit='',step='any')=><NumberField key={name} name={name} label={label} unit={unit} step={step} value={config[name]} onChange={v=>set(name,v)}/>;
  const q1=getDeviceModel(config.deviceModels?.Q1),sizeSupported=t.supportedOperations.includes('size');
  return<>
@@ -113,7 +123,7 @@ export default function App(){
     <div className="quick-results">{p?<><Metric label="LED 전류" value={show(p.current,1000,'mA')} hint={p.region}/><Metric label="LED Vf / 개" value={show(p.ledVf,1,'V')}/>{topologyUsesGPIO(t)&&<Metric label="GPIO 전류" value={show(p.gpioCurrent,1000,'mA')} hint="+ source / − sink"/>}<Metric label="Driver 손실" value={show(p.driverPower,1000,'mW')}/></>:<div className="quick-error"><strong>현재 조건 계산 불가</strong><span>{result.error?.message}</span></div>}</div>
     <Inspector view={selectedView}/>
     <DesignSummary config={p?.config??config} point={p} validation={result.ok?result.validation:null}
-     corners={corners} mode={mode} goal={result.sizing?.goal??null} onInspect={setSelectedInstance}/>
+     corners={corners} mode={mode} goal={goalView} onInspect={setSelectedInstance}/>
    </div>
   </section>
 
@@ -166,11 +176,16 @@ export default function App(){
          <p className="subtle">광도는 선택 시험점과 전형적 상대곡선 기반 추정입니다. 선정 저항으로 목표 달성을 다시 검사합니다.</p></>}
        {opticalNotice&&<p role="status" className="model-chip">{opticalNotice}</p>}
        {!opticalCap.canInvert&&<p className="subtle">이 LED는 광도 역산의 근거가 부족합니다. 전류 목표는 사용할 수 있습니다.</p>}
+       <div className="fields two"><label className="field" htmlFor="goal-criterion"><span>목표 판정 기준</span>
+         <select id="goal-criterion" value={criterion} onChange={e=>setCriterion(e.target.value)}>
+          <option value="minimum">최소 목표 이상 (미만이면 미달)</option><option value="approximate">목표 ± 허용 오차 이내</option>
+         </select></label>
+         {criterion==='approximate'&&<NumberField name="tolerancePct" label="허용 오차" unit="±%" value={tolerancePct} onChange={setTolerancePct}/>}</div>
        <div className="fields two"><label className="field" htmlFor="series"><span>E-series</span><select id="series" value={series} onChange={e=>setSeries(e.target.value)}>{['E24','E96','E24+E96'].map(s=><option key={s}>{s}</option>)}</select></label><label className="field" htmlFor="strategy"><span>표준값 선택</span><select id="strategy" value={strategy} onChange={e=>setStrategy(e.target.value)}><option value="closest">가장 가까운 저항</option><option value="safe">큰 저항</option><option value="bright">작은 저항</option></select></label></div>
        {result.sizing&&<div className="selection" data-testid="selected-resistance">
   <span>{show(result.sizing.selected,1,'Ω')}</span><small>연속값 {show(result.sizing.exact,1,'Ω')}</small>
-  {result.sizing.goal&&<b className={result.sizing.goal.met?'goal-met':'goal-missed'}>{result.sizing.goal.met?'목표 달성':'현재 선정값 목표 미달'}</b>}
-  <button onClick={()=>{set('resistance',result.sizing.selected);setMode('verify');}}>검증 모드에 적용</button>
+  {result.sizing.goal&&<b className={result.sizing.goal.met?'goal-met':'goal-missed'}>{goalVerdict(result.sizing.goal)}</b>}
+  <button onClick={applyGoal}>검증 모드에 적용</button>
  </div>}
      </>}
     </section>

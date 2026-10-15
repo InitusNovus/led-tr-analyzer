@@ -29,6 +29,9 @@
 .design-goal em{font-style:normal;font-weight:650;font-size:12px}
 .design-goal em.goal-missed,.goal-missed{color:#a54730}
 .goal-met{color:#197267}
+.design-goal[data-goal-status="met"] em{color:#197267}
+.design-goal[data-goal-status="missed"] em,.design-goal[data-goal-status="unavailable"] em,.design-goal[data-goal-status="not-computed"] em{color:#a54730}
+.design-goal small.goal-drift{color:#7a5b12;line-height:1.45}
 .design-optical{border-top:1px solid #e1e9ec;padding-top:12px}
 .design-optical>div{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px}
 .design-optical b{font-size:21px;color:#1b5268}

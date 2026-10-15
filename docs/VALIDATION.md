@@ -75,6 +75,9 @@ CI는 Node24에서 lockfile을 이용해 설치하고 위 경로를 실행합니
 - nominal 통과 + sampled 초과를 같은 설계 요약에서 **범위를 구별해** 표시
 - 별도의 사용자 가정 5V 제어원과 실제 STM32 GPIO 제한을 구분
 - 모바일에서 핵심 회로 소자가 가로 스크롤 초기 위치에 보이는지 확인
-- JSON v3 export에서 exact 부품 model ID, 독립 목표값, structured optical 결과를 확인
+- JSON v4 export에서 exact 부품 model ID, 독립 목표값, structured optical 결과, 적용한 목표와 구성 snapshot, 화면과 같은 판정을 확인
+- KT-0805R '최저 bin 40mcd' → E24 선택 → 적용 → 검증 후 같은 목표·기준·실제 mcd·차이·판정이 남는지 확인 (`closest`/`safe`/`bright` 포함)
+- 적용 뒤 VLED·RLED·LED를 바꾸면 달라진 항목이 표시되고, 광도 근거 없는 LED로 바꾸면 합격 표시 없이 '평가할 수 없음'이 되는지 확인
+- 최소 목표 기준과 허용 오차 기준이 서로 다른 문구로 판정되는지 확인
 
 **범위:** CI의 sampled grid는 지정한 입력 공차 축을 표본화한 것입니다. 반도체 생산 분포·모든 thermal corner·광학 bin 조합의 보증 worst case가 아닙니다. SVG 스크린샷과 coverage는 테스트 산출물이며 실측/제조승인이 아닙니다.

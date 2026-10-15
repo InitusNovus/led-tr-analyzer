@@ -1,6 +1,7 @@
 import { freshConfig, transitionConfig, topologyById } from '../core/topologies.js';
 import { LEDS } from '../data/catalog.js';
 import { opticalCapability } from '../core/optics.js';
+import { DEFAULT_GOAL_TOLERANCE_PCT } from '../core/goal.js';
 
 /**
  * Single source of truth for the workbench state.
@@ -12,6 +13,8 @@ export function initialDesignState() {
         config: freshConfig(), mode: 'verify',
         targetMa: 10, targetMcd: 60, targetKind: 'current', opticalBasis: 'typ', opticalNotice: '',
         series: 'E24+E96', strategy: 'closest',
+        // Editing-time judgement rule vs. the goal the user actually applied to verify mode.
+        criterion: 'minimum', tolerancePct: DEFAULT_GOAL_TOLERANCE_PCT, appliedGoal: null,
         includeDtc: false, cornerSnapshot: null, selectedInstance: 'Q1',
     };
 }
@@ -45,6 +48,15 @@ export function designReducer(state, action) {
         case 'targetKind':
             if (action.kind === 'mcd' && !opticalCapability(LEDS[state.config.led]).canInvert) return state;
             return { ...state, cornerSnapshot: null, targetKind: action.kind, opticalNotice: '' };
+        case 'applyGoal': {
+            // Keeps the intent and the configuration it was applied to; verify mode re-evaluates against the live point.
+            const config = { ...state.config, resistance: action.selectedResistance };
+            return withConfig(state, config, {
+                mode: 'verify',
+                appliedGoal: { intent: action.intent, selectedResistance: action.selectedResistance,
+                    exactResistance: action.exactResistance, snapshot: config },
+            });
+        }
         case 'reset':
             return initialDesignState();
         case 'patch':
