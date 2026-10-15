@@ -155,6 +155,27 @@ Iv_max_est(I) = Iv_max(I_test) * scale(I)
 
 Nominal 검사와 `analyzeCorners()`의 sampled extrema 및 위반 witness는 **서로 다른 scope**이며, sampled에서 일부 실패한 경우 전체 범위가 검증된 것으로 표시하지 않습니다. Optical bin range(동일 전류의 광학 범위)와 optical sampled range(여러 전기 조건으로 달라진 범위)도 별도의 개념입니다. 독립 광도/mA 목표 draft를 저장하므로 단위를 바꾸거나 미지원 LED로 전환해도 숫자를 잘못 재사용하지 않습니다.
 
+### 동작점 전압 예산과 구동 (`src/core/qpoint.js`)
+
+`qPointSummary(point)`는 풀이가 이미 낸 동작점을 읽어 전압 루프로 묶습니다. 새 회로식을 만들지 않으며, 각 루프는 `rail = Σ 항`이고 `residual`을 함께 반환합니다.
+
+| 토폴로지 | 부하 경로 (rail) | 구동 경로 |
+|---|---|---|
+| 저항 직결 | VLED = VRLED + n·Vf | — |
+| GPIO Source | VDD = GPIO 출력 강하 + VRLED + n·Vf | (부하 경로에 포함) |
+| GPIO Sink | VLED = VRLED + n·Vf + 핀 전압 | (부하 경로에 포함) |
+| digital NPN / NPN 로우사이드 / NMOS 로우사이드 | VLED = VRLED + n·Vf + VCE 또는 VDS | 핀 = II·R1 + VBE / IB·RB + VBE / IRG·RG + VGS |
+| NPN 에미터 팔로워 | VLED = VCE + VRLED + n·Vf (LED·RLED는 **IE**, VCE 항은 **IC**) | 핀 = IB·RB + VBE + VE |
+| NPN 에미터 저항 전류 싱크 | VLED = VRLED + n·Vf + VCE + **IE·RE** | 핀 = IB·RB + VBE + VE |
+| PNP / PMOS 하이사이드 (직접) | VLED = VEC 또는 VSD + VRLED + n·Vf | VLED = VEB + IB·RB + 핀 / VLED = VRGS + VRG + 핀 |
+| NPN→PNP / NPN→PMOS / NMOS→PMOS | VLED = Q2 강하 + VRLED + n·Vf | ① 핀 = Q1 입력 루프 ② VLED = Q2 구동(VEB 또는 RGS_OUT) + Rdrive·j + Q1 VCE/VDS |
+
+BJT 행에는 `IC`, `IB`, `IE`, 실제 `IC/IB`, 그 IC에서의 `hFE`(데이터시트 gain 곡선), 데이터시트 VCE(sat) 시험 `IC/IB`와 근거 figure·조건이 들어갑니다. BC847B는 VCE(sat) 곡선이 IC/IB=20, VBE(sat) 곡선이 IC/IB=10이라 `ratioMismatch`로 표시합니다. 활성 영역의 IC/IB는 hFE를 따르며, 에미터 팔로워·전류 싱크에서는 의도된 동작이므로 불량으로 판정하지 않습니다. **IC/IB 합격선(β≤10/20)은 없습니다.**
+
+DTC 행은 네 값을 구분합니다. `IO/II`는 외부 단자 전류비(ROHM GI 및 IO/II=10 기준의 VO(on) 곡선과 같은 정의), `II`는 R1을 지나는 외부 입력 전류, `IB`는 R2로 빠지는 전류 `VBE/R2`를 뺀 내부 베이스 전류, `IC/IB`는 그 내부 베이스 기준 비율입니다. 기본 회로에서 II≈0.5441mA, IB≈0.5289mA, IO/II≈16.53, IC/IB≈17.01입니다.
+
+OFF(전류 0)에서는 누설을 모델링하지 않고 소자 전압은 상한만 알 수 있으므로 분담과 구동비를 만들지 않고 안내만 표시합니다. 베이스 부유(Hi-Z, pull 없음)나 전압 도메인이 다른 OFF처럼 모델이 정하지 못하는 조건은 솔버가 `unsupported`로 거절하므로 요약 자체가 만들어지지 않습니다. 이 요약은 SPICE 수준의 전하 저장·과도 해석을 포함하지 않습니다.
+
 ### 감도 분석 실행 정책과 응답성
 
 `analyzeCorners()`는 `planCorners()`(시나리오 격자와 축 정보) → `evaluateCorner()`(시나리오 1개) → `summarizeCorners()`(극값·위반·광도 범위)로 나뉘고, 한 번에 실행해도 같은 결과를 냅니다. 화면은 `src/ui/cornerRunner.js`가 약 12ms 단위로 UI 스레드를 양보하며 실행하고, 입력이 바뀌면 취소합니다.

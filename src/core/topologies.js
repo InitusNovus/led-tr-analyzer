@@ -116,7 +116,7 @@ const power=(id,current,voltage,kind='resistor')=>({id,instanceId:id,current,vol
 const resistor=(id,current,resistance)=>({...power(id,current,current*resistance),resistance});
 const source=(id,current,voltage)=>({id,instanceId:id,current,voltage,power:current*voltage});
 const qPower=(id,q,modelId)=>({id,instanceId:id,kind:'bjt',modelId,current:q.collector,base:q.base,emitter:q.emitter,voltage:q.voltage,vbe:q.vbe,
-    power:q.collector*q.voltage+q.base*q.vbe,region:q.region});
+    power:q.collector*q.voltage+q.base*q.vbe,region:q.region,forcedBeta:q.forcedBeta,gainAtTest:q.gainAtTest});
 const mosPower=(id,current,voltage,gate,modelId)=>{
     const p=getDeviceModel(modelId);
     return {...power(id,current,voltage,'mosfet'),instanceId:id,modelId,gate,region:Math.abs(gate)<p.output[0].gate?'weak-drive':'conducting'};
@@ -200,6 +200,7 @@ function npnLow(c,ctx,digital=false){
         const die={...power('Q1.die',q.collector,q.voltage,'bjt'),instanceId:'Q1'};die.power+=q.base*q.vbe;
         r.ledger.push(die,resistor('Q1.R1',q.input,q.r1),resistor('Q1.R2',q.vbe/q.r2,q.r2));
         r.semiconductors.push({id:'Q1',instanceId:'Q1',modelId,kind:'digital',current:q.collector,base:q.base,emitter:q.emitter,voltage:q.voltage,inputVoltage:q.inputVoltage,
+            input:q.input,vbe:q.vbe,r1:q.r1,r2:q.r2,externalRatio:q.externalRatio,forcedBeta:q.forcedBeta,
             power:die.power+q.input*q.input*q.r1+q.vbe*q.vbe/q.r2,region:q.region});
     } else {
         const qp=qPower('Q1',q,modelId);r.semiconductors.push(qp);r.ledger.push(qp,resistor('RB',q.base,c.baseResistance));
