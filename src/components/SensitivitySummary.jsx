@@ -5,7 +5,7 @@ import { CORNER_PHASE_TEXT } from '../ui/viewModel.js';
 const amount = (v, scale = 1, unit = '') => v == null || !Number.isFinite(v) ? '—'
     : (v * scale).toLocaleString('en-US', { maximumSignificantDigits: 4 }) + (unit ? ' ' + unit : '');
 const AXIS_FORMAT = { V: v => amount(v, 1, 'V'), 'Ω': v => amount(v, 1, 'Ω'), '×': v => '×' + amount(v), '': v => amount(v) };
-const axisValue = (axis, v) => (AXIS_FORMAT[axis.unit] ?? AXIS_FORMAT[''])(v);
+export const axisValue = (axis, v) => (AXIS_FORMAT[axis.unit] ?? AXIS_FORMAT[''])(v);
 const METRICS = {
     current: ['LED 전류', 'mA'], resistorPower: ['RLED 전력', 'mW'],
     driverPower: ['Driver 손실', 'mW'], inputPower: ['입력 전력', 'mW'],

@@ -136,3 +136,11 @@ export const CORNER_PHASE_TEXT = {
     unavailable: '동작점 미계산', idle: '미실행', running: '계산 중…', stale: '입력 변경됨 · 다시 실행 필요',
     error: '분석 실패', partial: '일부 조건 미지원', complete: '완료',
 };
+
+/** Quantity in the unit the UI uses (mA, mW, V, ...); SI inside the core. */
+export const formatQuantity = (value, unit) => {
+    if (value == null || !Number.isFinite(value)) return '—';
+    const [scale, label] = unit === 'A' ? [1000, 'mA'] : unit === 'W' ? [1000, 'mW'] : [1, unit ?? ''];
+    return (value * scale).toLocaleString('en-US', { maximumSignificantDigits: 4 }) + (label ? ' ' + label : '');
+};
+export const formatSigned = (value, unit) => (value >= 0 ? '+' : '−') + formatQuantity(Math.abs(value), unit);
