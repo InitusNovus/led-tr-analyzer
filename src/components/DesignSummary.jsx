@@ -1,5 +1,6 @@
 import React from 'react';
 import { PACKAGE_PRESETS } from '../data/catalog.js';
+import { GOAL_BASIS_LABEL, goalVerdict } from '../ui/viewModel.js';
 
 const amount=(v,scale=1,unit='')=>v==null||!Number.isFinite(v)?'—':(v*scale).toLocaleString('en-US',{maximumSignificantDigits:4})+(unit?' '+unit:'');
 const formatCheck=c=>amount(c.actual,c.unit==='A'?1000:c.unit==='W'?1000:1,c.unit==='A'?'mA':c.unit==='W'?'mW':c.unit??'');
@@ -80,6 +81,20 @@ function WarningSummary({point,validation,corners,onInspect}){
   {flagged.length>0&&<p>모델 한계 {flagged.length}건: {flagged.slice(0,3).join(' · ')}</p>}
  </div>;
 }
+function GoalSummary({goal}){
+ const optical=goal.kind==='optical',scale=optical?1:1000,unit=optical?'mcd':'mA',applied=goal.origin==='applied';
+ const signed=v=>v==null||!Number.isFinite(v)?'—':(v>=0?'+':'−')+amount(Math.abs(v),scale,unit);
+ return <div className="design-goal" data-goal-origin={goal.origin} data-goal-status={goal.status} data-goal-criterion={goal.criterion}>
+  <strong>{applied?'적용된 목표':'편집 중인 목표'} ({optical?'광도':'전류'}){applied?' · 현재 구성으로 재평가':''}</strong>
+  <span>{optical?GOAL_BASIS_LABEL[goal.basis]+' ':''}{amount(goal.target,scale,unit)} → {amount(goal.achieved,scale,unit)}
+   {goal.error!=null&&<> · 차이 {signed(goal.error)}{goal.errorPct!=null&&' ('+(goal.errorPct>=0?'+':'−')+Math.abs(goal.errorPct).toFixed(1)+'%)'}</>}</span>
+  <em>{goalVerdict(goal)}</em>
+  {applied&&<small className="goal-applied">선정 저항 {amount(goal.selectedResistance,1,'Ω')} (연속값 {amount(goal.exactResistance,1,'Ω')}) · {goal.series} · {goal.strategy}</small>}
+  {applied&&(goal.drift.length?<small className="goal-drift" role="status">적용 시점과 다른 항목: {goal.drift.map(d=>d.label+' '+(d.from??'—')+' → '+(d.to??'—')+(d.unit?' '+d.unit:'')).join(' · ')}. 위 값은 현재 구성의 계산이며 적용 당시 결과가 아닙니다.</small>
+    :<small className="goal-drift" role="status">적용 시점의 구성과 같습니다.</small>)}
+  {optical&&<small>광도 목표는 제조사 보증이 아니라 전형적 상대곡선에 기반한 bin 추정입니다.</small>}
+ </div>;
+}
 export default function DesignSummary({config,point,validation,corners,mode,goal,onInspect}){
  const sampleState=corners?(corners.error?'분석 실패':corners.failures?.length?'일부 조건 미지원':corners.anyExceeded?'초과 조건 있음':'입력한 표본 내'):'미실행';
  return <section className="panel design-summary" aria-label="설계 판단 요약">
@@ -88,12 +103,7 @@ export default function DesignSummary({config,point,validation,corners,mode,goal
    <div><small>Nominal 정격 검사</small><strong>{validation?.label??'동작점 미계산'}</strong></div>
    <div><small>Sampled sensitivity</small><strong>{sampleState}</strong><span>{corners?.count!=null?corners.validCount+'/'+corners.count+'개 계산':''}</span></div>
   </div>
-  {goal&&<div className="design-goal"><strong>목표 달성 ({goal.kind==='optical'?'광도':'전류'})</strong>
-    <span>{goal.kind==='optical'?goal.basis+' 기준 '+amount(goal.targetMcd,1,'mcd')+' → '+amount(goal.achievedMcd,1,'mcd'):
-      amount(goal.targetCurrent,1000,'mA')+' → '+amount(goal.achievedCurrent,1000,'mA')}</span>
-    <em>{goal.met?'현재 선정값에서 달성':'현재 선정값에서 목표 미달'}</em>
-    {goal.kind==='optical'&&<small>광도 목표는 제조사 보증이 아니라 전형적 상대곡선에 기반한 bin 추정입니다.</small>}
-   </div>}
+  {goal&&<GoalSummary goal={goal}/>}
   <OpticalResult optical={point?.optical}/>
   <VoltagePath config={config} point={point}/>
   <PowerUsage config={config} point={point} corners={corners}/>

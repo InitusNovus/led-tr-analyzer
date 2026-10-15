@@ -118,3 +118,11 @@ export function buildInstanceViews(config,point,validation) {
   }
   return [...map.values()];
 }
+
+export const GOAL_BASIS_LABEL = { min: '최저 bin 기준 추정', typ: '제조사 typ anchor 기준', representative: '중간 대표값 가정' };
+/** One-line verdict that names the rule used, so a minimum threshold is never read as an exact-target match. */
+export const goalVerdict = g => g.status === 'unavailable' ? '현재 구성에서는 이 기준으로 평가할 수 없음'
+    : g.status === 'not-computed' ? '현재 조건에서 동작점을 계산할 수 없음'
+    : g.criterion === 'approximate' ? (g.met ? '목표 ±' + g.tolerancePct + '% 이내' : '허용 오차 ±' + g.tolerancePct + '% 밖')
+    : (g.met ? '최소 목표 이상 충족' : '최소 목표 미달');
+

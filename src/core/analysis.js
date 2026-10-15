@@ -2,7 +2,8 @@ import { ModelError, finite, bisect, standardResistor, unique } from './math.js'
 import { normalizeConfig, solvePoint, topologyById, topologyUsesGPIO } from './topologies.js';
 import { LEDS, getDeviceModel } from '../data/catalog.js';
 import { context, sample } from './devices.js';
-import { solveOpticalCurrent, opticalValueForBasis, opticalCapability } from './optics.js';
+import { solveOpticalCurrent, opticalCapability } from './optics.js';
+import { evaluateGoal, normalizeCriterion } from './goal.js';
 /** Canonical validation IDs are independent from translated user-facing labels. */
 export function checkLimits(point) {
     const c=point.config,led=LEDS[c.led],checks=[],t=topologyById(c.topology);
@@ -85,7 +86,8 @@ export function analyzeCorners(input,{includeDtc=false}={}){
         anyExceeded:violations.length>0,
         flags:unique(samples.flatMap(s=>s.point.flags)),note:'Vf offset is user-assumed. Typical device curves are held fixed. Sampled extrema are not guaranteed process/thermal worst cases. RB/RE and auxiliary resistors are nominal; RLED tolerance is swept only.'};
 }
-export function selectResistance(input,targetCurrent,{series='E24+E96',strategy='closest',targetMcd=null,opticalBasis='auto'}={}){
+export function selectResistance(input,targetCurrent,{series='E24+E96',strategy='closest',targetMcd=null,opticalBasis='auto',criterion='minimum',tolerancePct}={}){
+    const goalRule=normalizeCriterion(criterion,tolerancePct);
     const c=normalizeConfig(input),t=topologyById(c.topology);let target=targetCurrent;
     if(!t.supportedOperations.includes('size'))throw new ModelError('unsupported','이 토폴로지는 RLED 자동 역산을 지원하지 않습니다.');
     let opticalGoal=null;
@@ -100,12 +102,10 @@ export function selectResistance(input,targetCurrent,{series='E24+E96',strategy=
     const root=bisect(l=>currentAtLog(l)-target,lo,hi,{fTolerance:Math.max(target*1e-7,1e-12),xTolerance:1e-10});
     if(!root.converged)throw new ModelError('nonconvergence','저항 역산이 수렴하지 않았습니다.');
     const exact=10**root.value,selected=standardResistor(exact,series,strategy),result=analyzePoint({...c,resistance:selected});
-    const achieved=opticalGoal&&result.ok?opticalValueForBasis(result.point.optical,resolvedBasis):null;
-    const goal=opticalGoal?{kind:'optical',basis:resolvedBasis,targetMcd,desiredCurrent:target,
-        achievedMcd:achieved,met:Number.isFinite(achieved)&&achieved>=targetMcd*(1-1e-7),
-        validity:opticalGoal.validity,assumptions:opticalGoal.assumptions}
-      :{kind:'current',targetCurrent:target,achievedCurrent:result.ok?result.point.current:null,
-        met:result.ok&&result.point.current>=target*(1-1e-7)};
+    const intent=opticalGoal?{kind:'optical',basis:resolvedBasis,targetMcd,desiredCurrent:target,
+        validity:opticalGoal.validity,assumptions:opticalGoal.assumptions,...goalRule}
+      :{kind:'current',targetCurrent:target,...goalRule};
+    const goal=evaluateGoal(result.ok?result.point:null,intent);
     return{exact,selected,targetCurrent:target,result,goal,
         note:'선택된 표준 저항으로 실제 전류·광도 목표 달성 여부를 다시 계산했습니다. 표본/제조 편차의 보증은 아닙니다.'};
 }

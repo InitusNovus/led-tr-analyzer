@@ -134,6 +134,17 @@ Iv_max_est(I) = Iv_max(I_test) * scale(I)
 
 저항 역산은 `optical basis → I_target → 동일 DC topology solver → E-series → 실제 선정 저항의 optical` 순으로 진행합니다. `safe`(큰 저항) 반올림이 최소 광도 목표 미달로 이어질 수 있으므로 목표 달성을 재확인합니다.
 
+### 목표 판정 (`src/core/goal.js`)
+
+`evaluateGoal(point, intent)`는 저항 선정 모드와 검증 모드가 함께 쓰는 순수 함수입니다. 판정 기준은 둘 중 하나입니다.
+
+- `minimum`: `achieved ≥ target` (상대 허용 1e-7). 초과는 충족이며 '정확 일치'를 뜻하지 않습니다.
+- `approximate`: `|achieved − target| ≤ target × tolerancePct/100`. 초과도 허용 범위를 벗어나면 미달입니다.
+
+`status`는 `met` / `missed` / `unavailable`(선택 기준을 모델이 표현하지 못함, 예: 광도 근거 없는 LED) / `not-computed`(동작점 없음)이며, 오차는 `achieved − target`과 target 대비 %로 함께 반환합니다.
+
+`검증 모드에 적용`은 목표 intent와 적용 시점 구성(snapshot)을 보관합니다. 검증 모드는 snapshot의 결과를 재사용하지 않고 **현재 구성으로 다시 평가**하며, `goalDrift()`가 snapshot과 달라진 동작점 입력(토폴로지, LED, 부품 model ID, 전원, 저항, 구동 상태 등)을 나열합니다. 공차·정격·주변온도 입력은 동작점을 바꾸지 않으므로 목록에 넣지 않습니다.
+
 `opticalUsageGuide()`는 초기 버전의 mcd 숫자 해석을 돕는 **비정량적 실무 가이드**이며 광도·정격 solver의 입력이 아닙니다. 상대 광도는 눈으로 느끼는 밝기와 일대일 대응하지 않으며 색·거리·시야각·주변조도·광학구조·PWM을 모델링하지 않습니다.
 
 ## 사용자 가정 독립 제어원과 canonical 검사 (이슈 #21)
