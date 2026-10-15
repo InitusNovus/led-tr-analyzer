@@ -111,3 +111,31 @@
 .qpoint-help ul{margin:6px 0 0;padding-left:18px;display:grid;gap:5px;font-size:12px;color:#335664;line-height:1.5}
 .link-button{margin-left:auto;background:none;border:0;color:#0f6b7a;text-decoration:underline;font-size:11px;padding:0;cursor:pointer}
 
+
+.warning{gap:6px}
+.warning-head{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.warning-badge{font-size:10px;font-weight:700;border-radius:4px;padding:1px 6px}
+.warning-badge.severity{background:#f3d9cf;color:#7b3d2b}
+.warning-badge.scope{background:#e4ebee;color:#335664}
+.warning[data-severity="margin"]{background:#fff8e6;border-left-color:#c9a227}
+.warning[data-severity="margin"] .warning-badge.severity{background:#f6e9b8;color:#6b5410}
+.warning[data-severity="unknown"]{background:#f1f4f6;border-left-color:#8a9ba5}
+.warning[data-severity="unknown"] .warning-badge.severity{background:#dfe6ea;color:#44555f}
+.warning-title{font-weight:700;color:#3a2a24}
+.warning-measure,.warning-cause{font-size:12px;line-height:1.5;color:#4a3d38;font-variant-numeric:tabular-nums}
+.warning-cause{color:#6a5b55}
+.warning-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.design-alert .warning-actions button{border:1px solid #d9b8aa;background:#fff;border-radius:6px;padding:3px 8px;font-weight:600;font-size:11px;color:#7b3d2b;cursor:pointer}
+.design-alert .warning-actions button.chip{font-weight:500;color:#5a4a44}
+.warning-scope-note{font-size:12px;color:#596d78;margin:0}
+.warning-approx summary{cursor:pointer;font-size:12px;color:#596d78}
+.warning-approx ul{margin:6px 0 0;padding-left:18px;font-size:12px;color:#596d78;line-height:1.5}
+.power-meter{position:relative;overflow:visible}
+.power-meter .power-fill{position:absolute;left:0;top:0;border-radius:30px}
+.power-line{position:absolute;top:-3px;width:2px;height:18px;background:#0f4c5c;margin-left:-1px}
+.power-line.rated{background:#8a9ba5;border-left:1px dashed #8a9ba5;width:0}
+.power-peak{position:absolute;top:-2px;width:10px;height:16px;margin-left:-5px;border-radius:3px;background:#b46a4a;border:2px solid #fff;box-sizing:border-box}
+.power-formula{color:#6d828d;font-size:11px}
+.power-need{font-size:12px;color:#7b3d2b;margin-top:6px}
+.design-power .primary{margin-top:8px}
+[data-focus-flash]{outline:3px solid #e0a15a;outline-offset:2px;transition:outline-color .4s}

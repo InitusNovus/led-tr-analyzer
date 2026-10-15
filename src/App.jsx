@@ -12,28 +12,13 @@ import DesignSummary from './components/DesignSummary.jsx';
 import{SensitivityWitness}from'./components/SensitivitySummary.jsx';
 import QuickSpecs from './components/QuickSpecs.jsx';
 import { opticalCapability } from './core/optics.js';
+import { flagText } from './core/flags.js';
+import { sortedPresets } from './core/warnings.js';
 import'./index.css';
 
 const show=(v,scale=1,unit='')=>v==null||!Number.isFinite(v)?'—':(v*scale).toLocaleString('en-US',{maximumSignificantDigits:4})+(unit?' '+unit:'');
-const FLAGS={
- 'legacy-led-unverified':'legacy LED 데이터입니다.',
- 'approximation:LED-table-midpoint':'LED: typ Vf가 없어 표의 min/max 가운데값을 계산 가정으로 사용합니다.',
- 'not-modeled:LED-vf-current-shape':'LED: 시험 전류에 따른 Vf 형상은 모델링하지 않았습니다.',
- 'not-modeled:LED-temperature':'LED: 선택 온도의 전기적 온도 의존성 자료가 없어 25°C 곡선을 유지합니다.',
- 'not-modeled:LED-absolute-optical-anchor':'LED: 원문 광도 범위는 있지만 단일 typ anchor가 없어 scalar mcd를 만들지 않습니다.',
- 'not-modeled:LED-optical-current-shape':'LED: 단일 광도 시험점은 있으나 전류-광도 곡선이 없습니다.',
- 'approximation:GPIO-limit-points-not-typical':'GPIO: 한계 시험점을 잇는 가정 곡선입니다.',
- 'approximation:BJT-active-saturation-bridge':'BJT: 활성/포화 곡선 사이를 축약 근사합니다.',
- 'approximation:BJT-saturation-drive-ratio-mismatch':'BJT: 서로 다른 강제 전류비의 datasheet 곡선을 bridge anchor로 사용합니다.',
- 'approximation:BJT-strong-base-drive':'BJT: 강한 베이스 구동 구간은 근사입니다.',
- 'approximation:DTC-terminal-bridge-and-internal-Vbe':'DTC: 외부 IO/II 곡선 기반 연결 근사이며 내부 VBE는 별도 가정입니다.',
- 'not-modeled:self-heating-feedback':'자가발열의 전기 특성 피드백은 계산하지 않습니다.',
- 'not-modeled:transistor-electrical-temperature':'TR 전기 곡선은 25°C 기준입니다.',
- 'not-modeled:off-leakage':'OFF 누설/역급전/과도는 모델링하지 않습니다.',
- 'not-verified:direct-high-side-OFF-domain':'직접 하이사이드의 다른 전압 도메인 OFF는 별도 모델이 필요합니다.'
-};
 const cls=(...v)=>v.filter(Boolean).join(' ');
-function Flag({value}){return<li>{FLAGS[value]??(value.startsWith('extrapolation:')?'곡선 범위 밖 외삽: '+value.slice(14):value.replace('approximation:','명시적 근사: ').replace('not-modeled:','미모델화: '))}</li>;}
+function Flag({value}){return<li>{flagText(value)}</li>;}
 function NumberField({name,label,value,onChange,unit='',step='any',disabled=false}){
  const blank=value==='';
  return <label className="field" htmlFor={name}><span>{label}<small>{unit}</small></span>
@@ -69,11 +54,11 @@ function Inspector({view}){
 }
 export default function App(){
  const[state,dispatch]=useReducer(designReducer,undefined,initialDesignState);
- const{config,mode,targetMa,targetMcd,targetKind,opticalBasis,opticalNotice,series,strategy,criterion,tolerancePct,appliedGoal,cornerSnapshot,cornersStale,includeDtc,selectedInstance}=state;
+ const{config,mode,targetMa,targetMcd,targetKind,opticalBasis,opticalNotice,series,strategy,criterion,tolerancePct,appliedGoal,marginPct,cornerSnapshot,cornersStale,includeDtc,selectedInstance}=state;
  const patch=(p,invalidate=false)=>dispatch({type:'patch',patch:p,invalidate});
  const setMode=v=>patch({mode:v}),setTargetMa=v=>patch({targetMa:v}),setTargetMcd=v=>patch({targetMcd:v}),
   setOpticalBasis=v=>patch({opticalBasis:v}),setSeries=v=>patch({series:v}),setStrategy=v=>patch({strategy:v}),
-  setCriterion=v=>patch({criterion:v}),setTolerancePct=v=>patch({tolerancePct:v}),setIncludeDtc=v=>patch({includeDtc:v}),setCornerSnapshot=v=>dispatch({type:'corners',snapshot:v}),setSelectedInstance=v=>patch({selectedInstance:v});
+  setCriterion=v=>patch({criterion:v}),setMarginPct=v=>patch({marginPct:v}),setTolerancePct=v=>patch({tolerancePct:v}),setIncludeDtc=v=>patch({includeDtc:v}),setCornerSnapshot=v=>dispatch({type:'corners',snapshot:v}),setSelectedInstance=v=>patch({selectedInstance:v});
  const t=topologyById(config.topology),led=LEDS[config.led],optical=opticalEvidence(led);
  const set=(key,value)=>dispatch({type:'config',key,value});
  const setDevice=(id,value)=>dispatch({type:'device',id,value});
@@ -108,6 +93,17 @@ export default function App(){
    manualCancel.current=runCorners({includeDtc},()=>{manualCancel.current=null;setManualRunning(false);});};
  const parts=selectedParts(config,t),views=buildInstanceViews(applied??config,p,result.ok?result.validation:null),activeSelected=selectedInstance,selectedView=views.find(v=>v.instanceId===selectedInstance)??null;
  const reset=()=>dispatch({type:'reset'});
+ // Moves focus to the first listed input that is on screen (a warning's primary fix), and flashes it.
+ const focusInput=ids=>{
+   for(const id of ids){
+     const el=document.getElementById(id);
+     if(!el||el.disabled)continue;
+     el.scrollIntoView({block:'center',behavior:'smooth'});el.focus({preventScroll:true});
+     el.setAttribute('data-focus-flash','1');setTimeout(()=>el.removeAttribute('data-focus-flash'),1800);
+     return true;
+   }
+   return false;
+ };
  // size mode: the goal being edited; verify mode: the applied goal, re-judged against the live operating point.
  const goalView=useMemo(()=>{
    if(mode==='size')return result.sizing?.goal?{...result.sizing.goal,origin:'editing',drift:[]}:null;
@@ -142,7 +138,8 @@ export default function App(){
     <div className="quick-results">{p?<><Metric label="LED 전류" value={show(p.current,1000,'mA')} hint={p.region}/><Metric label="LED Vf / 개" value={show(p.ledVf,1,'V')}/>{topologyUsesGPIO(t)&&<Metric label="GPIO 전류" value={show(p.gpioCurrent,1000,'mA')} hint="+ source / − sink"/>}<Metric label="Driver 손실" value={show(p.driverPower,1000,'mW')}/></>:<div className="quick-error"><strong>현재 조건 계산 불가</strong><span>{result.error?.message}</span></div>}</div>
     <Inspector view={selectedView}/>
     <DesignSummary config={p?.config??config} point={p} validation={result.ok?result.validation:null}
-     corners={corners} cornerPhase={phase} cornerProgress={cornerProgress} mode={mode} goal={goalView} onInspect={setSelectedInstance}/>
+     corners={corners} cornerPhase={phase} cornerProgress={cornerProgress} mode={mode} goal={goalView} marginPct={marginPct}
+     view={{mode,targetKind}} onInspect={setSelectedInstance} onFocusInput={focusInput} onSetConfig={set}/>
    </div>
   </section>
 
@@ -213,13 +210,14 @@ export default function App(){
        <label className="field" htmlFor="package"><span>RLED generic 패키지 preset</span>
        <select id="package" value={Object.keys(PACKAGE_PRESETS).find(k=>PACKAGE_PRESETS[k]===config.resistorRating)??'custom'}
          onChange={e=>{if(e.target.value!=='custom')set('resistorRating',PACKAGE_PRESETS[e.target.value]);}}>
-        {Object.entries(PACKAGE_PRESETS).map(([k,v])=><option key={k} value={k}>{k} · {v*1000}mW</option>)}
+        {sortedPresets(PACKAGE_PRESETS).map(([k,v])=><option key={k} value={k}>{k} · {v*1000}mW</option>)}
         <option value="custom">직접 지정</option>
        </select></label>
        {number('resistorRating','RLED 실제 정격','W')}
        {number('auxRating','보조 저항 정격','W')}
        {number('derating','입력한 사용 비율','0–1')}
        {number('ambient','주변 온도','°C')}
+       <NumberField name="marginPct" label="여유 경고 기준" unit="한계 대비 %" value={marginPct} onChange={setMarginPct}/>
       </div>
       <p className="subtle">Generic preset은 실제 모든 해당 크기 저항의 정격을 보증하지 않습니다.</p>
     </section>

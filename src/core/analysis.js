@@ -99,6 +99,20 @@ export function summarizeCorners(plan,outcomes){
     }
     const violations=samples.flatMap((s,idx)=>s.validation.checks.filter(check=>check.status==='exceeded')
        .map(check=>({scenario:s.scenario,scenarioId:'sample-'+idx,check:{...check,scope:'scenario'}})));
+    // Grouped over every sample (violations above is truncated): per rule and instance, how many scenarios exceed
+    // and which one is worst, so the UI can name a cause instead of dumping scenarios.
+    const groups=new Map();
+    samples.forEach((s,idx)=>{
+        for(const check of s.validation.checks){
+            if(check.status!=='exceeded')continue;
+            const key=check.ruleId+'|'+check.instanceId+'|'+check.id,ratio=check.limit>0?check.actual/check.limit:Infinity;
+            const g=groups.get(key)??{key,ruleId:check.ruleId,instanceId:check.instanceId,id:check.id,metric:check.metric,unit:check.unit,limit:check.limit,
+                condition:check.condition,count:0,worst:null};
+            g.count++;
+            if(!g.worst||ratio>g.worst.ratio)g.worst={actual:check.actual,ratio,scenario:s.scenario,scenarioId:'sample-'+idx};
+            groups.set(key,g);
+        }
+    });
     const opticalAvailable=samples.filter(s=>s.point.optical?.kind!=='unavailable');
     const opticalRange=opticalAvailable.length?{
        min:Math.min(...opticalAvailable.map(s=>s.point.optical.minMcd??s.point.optical.nominalMcd).filter(Number.isFinite)),
@@ -121,7 +135,7 @@ export function summarizeCorners(plan,outcomes){
     };
     return{kind:'sampled-sensitivity',count:plan.scenarios.length,validCount:samples.length,failures,extrema,
         axes:plan.axes,opticalSpread,
-        opticalRange,violations:violations.slice(0,30),violationCount:violations.length,
+        opticalRange,violations:violations.slice(0,30),violationCount:violations.length,violationGroups:[...groups.values()],
         anyExceeded:violations.length>0,
         flags:unique(samples.flatMap(s=>s.point.flags)),note:'Vf offset is user-assumed. Typical device curves are held fixed. Sampled extrema are not guaranteed process/thermal worst cases. RB/RE and auxiliary resistors are nominal; RLED tolerance is swept only.'};
 }

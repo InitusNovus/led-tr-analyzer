@@ -2,6 +2,7 @@ import { freshConfig, transitionConfig, topologyById } from '../core/topologies.
 import { LEDS } from '../data/catalog.js';
 import { opticalCapability } from '../core/optics.js';
 import { DEFAULT_GOAL_TOLERANCE_PCT } from '../core/goal.js';
+import { DEFAULT_MARGIN_PCT } from '../core/warnings.js';
 
 /**
  * Single source of truth for the workbench state.
@@ -16,6 +17,8 @@ export function initialDesignState() {
         // Editing-time judgement rule vs. the goal the user actually applied to verify mode.
         criterion: 'minimum', tolerancePct: DEFAULT_GOAL_TOLERANCE_PCT, appliedGoal: null,
         // cornersStale: a sampled result existed but an input changed since (distinct from 'never run').
+        // marginPct: user-set heads-up threshold (% of a limit). Not an electrical input, so it never invalidates results.
+        marginPct: DEFAULT_MARGIN_PCT,
         includeDtc: false, cornerSnapshot: null, cornersStale: false, selectedInstance: 'Q1',
     };
 }
