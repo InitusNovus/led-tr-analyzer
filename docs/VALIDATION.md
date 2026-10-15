@@ -73,6 +73,12 @@ CI는 Node24에서 lockfile을 이용해 설치하고 위 경로를 실행합니
 - 계산 실패 중에도 정적 instance 유지, Q1.R1/2 및 RGS_IN/OUT canonical 식별
 - `checkLimits`가 ruleId/instanceId/unit/scope를 포함하고 같은 inspector에 연결
 - nominal 통과 + sampled 초과를 같은 설계 요약에서 **범위를 구별해** 표시
+- 13개 토폴로지(변형 6종)에서 부하 경로와 구동 경로의 KVL 잔차가 1e-6 V 이하이고, 전력 수지 잔차도 함께 맞는지 확인 (`tests/qpoint.test.js`)
+- DTC 기본 회로에서 II≈0.5441mA, IB≈0.5289mA, 외부 IO/II≈16.53, 내부 IC/IB≈17.01이 함께 표시되고 서로 다른 값인지 확인
+- 에미터 팔로워는 LED에 IE, VLED 공급에 IC를 표시하고, 전류 싱크의 RE 전압이 IE×RE인지 확인 (IC×RE가 아님)
+- 2단 하이사이드는 GPIO→Q1 입력 경로와 Q2 구동 경로가 별도 루프로 나뉘는지 확인
+- OFF 상태에서 전압 분담·구동비를 만들어 내지 않고, 모델이 판정하지 못하는 조건은 솔버가 거절하는지 확인
+- BJT에 β 합격선이 없고 활성 영역을 불량으로 표시하지 않는지, 근거 figure와 시험 IC/IB가 모델별로 맞는지 확인
 - 기본 설계에서 nominal 전류와 sampled 최소·최대가 같은 요약에 표시되고, 값이 극값 witness 시나리오로 재현되는지 확인 (`tests/sensitivity.test.js`)
 - 스윕한 축과 스윕하지 않은 조건(RB/RE, 온도, 전형 곡선, DTC 내부 공차)이 결과에 함께 나오는지 확인
 - 일부 조건이 모델 적용범위 밖(예: GPIO VDD 3.5V ±5%)이면 `partial`로 제외 개수와 이유를 표시하고 전체 통과 문구가 나오지 않는지 확인

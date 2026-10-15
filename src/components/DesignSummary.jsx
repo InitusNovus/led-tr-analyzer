@@ -2,33 +2,12 @@ import React from 'react';
 import { PACKAGE_PRESETS } from '../data/catalog.js';
 import { GOAL_BASIS_LABEL, goalVerdict, CORNER_PHASE_TEXT } from '../ui/viewModel.js';
 import { SensitivityRibbon } from './SensitivitySummary.jsx';
+import QPointSummary from './QPointSummary.jsx';
 
 const amount=(v,scale=1,unit='')=>v==null||!Number.isFinite(v)?'—':(v*scale).toLocaleString('en-US',{maximumSignificantDigits:4})+(unit?' '+unit:'');
 const formatCheck=c=>amount(c.actual,c.unit==='A'?1000:c.unit==='W'?1000:1,c.unit==='A'?'mA':c.unit==='W'?'mW':c.unit??'');
 const humanCheck=c=>c?.id??c?.ruleId??'미확인';
 
-function VoltagePath({config,point}){
- if(!point)return null;
- const id=config.topology,items=[];
- const source=id==='gpio-source'?config.vdd:config.vcc;
- const vLed=point.ledVf*config.seriesCount,vRes=point.current*point.config.resistance;
- if(id!=='gpio-source'&&id!=='resistor'&&id!=='gpio-sink'&&point.driverVoltage==null)return null;
- items.push({id:'RLED',value:vRes},{id:'LED1',value:vLed});
- if(id==='npn-current-sink')items.push({id:'RE',value:(point.emitterCurrent??0)*config.emitterResistance});
- if(point.driverVoltage!=null)items.push({id:id.startsWith('gpio-')?'GPIO1':id==='npn-pnp'||id==='npn-pmos'||id==='nmos-pmos'?'Q2':'Q1',value:point.driverVoltage});
- const sum=items.reduce((n,x)=>n+x.value,0);
- return <div className="design-voltage">
-  <strong>부하 경로 전압 분담</strong>
-  <div className="voltage-rail"><span>{id==='gpio-source'?'GPIO VDD':'VLED'} {amount(source,1,'V')}</span><span>Σ {amount(sum,1,'V')}</span></div>
-  <div className="voltage-segments">
-   {items.map((x,i)=><div key={x.id+i} className="voltage-segment" style={{flexGrow:Math.max(1,x.value/source*100)}}>
-     <span>{x.id}</span><b>{amount(x.value,1,'V')}</b>
-   </div>)}
-  </div>
-  {(id==='npn-follower'||id==='npn-current-sink'||id==='npn-pnp'||id==='npn-pmos'||id==='nmos-pmos')&&
-   <small>부하 전압 경로의 요약입니다. GPIO/베이스 구동 분기는 별도이며 동일 전류가 아닙니다.</small>}
- </div>;
-}
 function PowerUsage({config,point,corners}){
  if(!point)return null;
  const limit=config.resistorRating*config.derating,nominal=point.resistorPower;
@@ -108,7 +87,7 @@ export default function DesignSummary({config,point,validation,corners,cornerPha
   <SensitivityRibbon point={point} corners={corners} phase={cornerPhase??'idle'} progress={cornerProgress}/>
   {goal&&<GoalSummary goal={goal}/>}
   <OpticalResult optical={point?.optical}/>
-  <VoltagePath config={config} point={point}/>
+  <QPointSummary point={point} onInspect={onInspect}/>
   <PowerUsage config={config} point={point} corners={corners}/>
   <WarningSummary point={point} validation={validation} corners={corners} onInspect={onInspect}/>
  </section>;

@@ -87,4 +87,27 @@
 .witness table{font-size:12px}
 .witness .witness-moved{font-weight:650;color:#0f4c5c;background:#eef7f7}
 .witness .witness-result th,.witness .witness-result td{border-top:2px solid #d3e4e6;font-weight:650}
+.qpoint{border-top:1px solid #e1e9ec;padding-top:12px;display:grid;gap:10px}
+.qpoint small{color:#6d828d;font-size:11px;line-height:1.45}
+.qpoint-path{display:grid;gap:6px}
+.qpoint-path-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline;font-size:12px}
+.qpoint-path-head span{color:#335664;font-variant-numeric:tabular-nums}
+.qpoint-path.drive .voltage-segment{background:#e6ecf5}
+.qpoint-path.drive .voltage-segment:nth-child(2){background:#d9e2f0}
+.qpoint-path.drive .voltage-segment:nth-child(3){background:#ccd8ea}
+.voltage-segment small{font-size:10px;color:#4b6573;margin:0;font-variant-numeric:tabular-nums}
+.qpoint-residual,.qpoint-warn{color:#a54730!important}
+.qpoint-devices{display:grid;gap:10px}
+.qpoint-device{border:1px solid #d3e4e6;border-radius:8px;padding:10px;display:grid;gap:7px;background:#fbfdfd}
+.qpoint-device-head{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.qpoint-device-head span{font-size:12px;color:#637b86}
+.qpoint-device-head em{font-style:normal;font-size:11px;color:#214d62;background:#e4f0f1;border-radius:4px;padding:1px 6px}
+.qpoint-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;font-variant-numeric:tabular-nums}
+.qpoint-metrics span{display:grid;gap:1px}
+.qpoint-metrics b{font-size:13px;color:#214d62}
+.qpoint-group{display:grid;gap:5px}
+.qpoint-group>strong{font-size:12px;color:#335664}
+.qpoint-help summary{cursor:pointer;font-size:12px;color:#214d62}
+.qpoint-help ul{margin:6px 0 0;padding-left:18px;display:grid;gap:5px;font-size:12px;color:#335664;line-height:1.5}
+.link-button{margin-left:auto;background:none;border:0;color:#0f6b7a;text-decoration:underline;font-size:11px;padding:0;cursor:pointer}
 

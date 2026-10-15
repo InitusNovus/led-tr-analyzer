@@ -18,8 +18,8 @@
 | 공차 preset (J/G/F/B)와 E-series 맥락 | PR #22 / #28 | 대기 | — |
 | 독립 DC 제어원 (IND) | PR #22 | 복구 (GPIO 제한은 해제하지 않음) | 브라우저 BASE |
 | 전류 Min/Max 즉시 표시 | #24 | 복구 (설계 요약에 Nominal과 sampled Min–Max를 함께 표시, 자동 계산) | 브라우저 G06, `tests/sensitivity.test.js` |
-| 전압 분담 요약 (VR/Vf/VCE) | #25 | 대기 | — |
-| β/IB 및 설명 | #25 | 대기 | — |
+| 전압 분담 요약 (VR/Vf/VCE) | #25 | 복구 (13개 토폴로지별 부하 경로·구동 경로 KVL) | 브라우저 G08, `tests/qpoint.test.js` |
+| β/IB 및 설명 | #25 | 복구 (합격선 없이 IC/IB·hFE·시험비를 구분, ⓘ 도움말) | 브라우저 G08, `tests/qpoint.test.js` |
 | 상세 검증 패널 (공차·구동·Vf 편차) | #24 | 동등 대체 (극값별 조건 표, 스윕/고정 축, 적용 소자; 구동비 해설은 #25) | 브라우저 G06 |
 | 경고·주의 카드 (심각도, 원인, 수정 방향) | #26 | 대기 | — |
 | 저항 전력 사용률 막대 | #26 | 대기 (nominal 막대는 PR #22) | — |
@@ -46,7 +46,7 @@
 | G05 | 광도 기준 역산 → 저항 적용 → 검증 모드 재평가 | #27 | 구현 (KT-0805R 40mcd, 변경 후 drift, 평가 불가, 판정 기준, JSON v4, 전체 초기화) | 11 |
 | G06 | nominal 전류 + sampled Min/Max + 근거 시나리오 | #24 | 구현 (띠, 극값 조건 표, 고정 축, 수동 DTC 확장, 무효화) | 11 |
 | G07 | nominal 통과/sampled 초과, 부분 실패 표시 | #24 #26 | 부분 (부분 실패 표시는 #24에서 구현, 위반 원인→입력 연결은 #26) | 4 |
-| G08 | BJT/DTC IC/IB·IO/II 해설 | #25 | 미구현 | 0 |
+| G08 | BJT/DTC IC/IB·IO/II 해설 | #25 | 구현 (DTC 외부/내부 비율, 팔로워 IE/IC, RE 전압, 2단 구동, OFF, 모바일) | 11 |
 | G09 | 13개 topology의 clickable instance → inspector → check | #29 | 부분 (렌더된 ref ⊆ 템플릿, RGS_IN/OUT) | 38 |
 | G10 | 입력 비운 뒤 복구, 계산 실패 중 정적 스펙 보존 | #29 | 부분 (4개 필드 복구만) | 6 |
 | G11 | 경고 → 정확한 field focus → 수정 → 재분석 | #26 | 미구현 | 0 |
