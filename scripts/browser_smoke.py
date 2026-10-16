@@ -41,6 +41,12 @@ console.log(JSON.stringify(out))"""],cwd=ROOT,text=True))
     page.set_content('<html lang="ko"><head><meta charset="UTF-8"></head><body><div id="root"></div></body></html>');page.add_style_tag(content=next((ROOT/'dist/assets').glob('*.css')).read_text());page.add_script_tag(type='module',content=next((ROOT/'dist/assets').glob('*.js')).read_text())
    else: page.goto(URL,wait_until='networkidle')
   load();expect(page.get_by_role('heading',name='LED-TR Analyzer',exact=True)).to_be_visible();expect(page.locator('.schematic')).to_be_visible();check(page.locator('#topology option').count()==len(catalog),'all topology choices')
+  # Self-hosted fonts load from the Pages subpath and are used by the page and by the schematic text (docs/FONTS.md).
+  page.evaluate('document.fonts.ready');page.wait_for_timeout(300)
+  loaded=page.evaluate("[...document.fonts].filter(f=>f.status==='loaded').map(f=>f.family)")
+  check('JetBrains Mono Variable' in loaded and 'Pretendard Variable' in loaded,'Latin and Hangul web fonts are loaded: '+str(sorted(set(loaded))))
+  check(not page.evaluate("[...document.fonts].some(f=>f.status==='error')"),'no web font failed to load at the subpath')
+  check(page.evaluate("getComputedStyle(document.body).fontFamily.startsWith('\"JetBrains Mono Variable\"')") and page.evaluate("getComputedStyle(document.querySelector('.schematic .part-label')).fontFamily.startsWith('\"JetBrains Mono Variable\"')"),'page text and schematic labels use the font token')
   scenario('G09')
   for t in catalog:
    page.locator('#topology').select_option(t['id']);expect(page.locator('.schematic')).to_have_attribute('data-topology',t['id']);check(page.locator('.schem-part').count()>=2,t['id']+' renders semantic parts')
