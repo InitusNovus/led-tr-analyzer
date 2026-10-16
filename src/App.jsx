@@ -9,6 +9,7 @@ import{LEDS,SOURCES,PACKAGE_PRESETS,modelsForFamily,getDeviceModel}from'./data/c
 import{selectedParts,partEvidence,opticalEvidence,buildInstanceViews,goalVerdict,cornerPhase}from'./ui/viewModel.js';
 import CircuitDiagram from'./components/CircuitDiagram.jsx';
 import DesignSummary from './components/DesignSummary.jsx';
+import ResultStrip from './components/ResultStrip.jsx';
 import{SensitivityWitness}from'./components/SensitivitySummary.jsx';
 import QuickSpecs from './components/QuickSpecs.jsx';
 import { opticalCapability } from './core/optics.js';
@@ -98,6 +99,7 @@ export default function App(){
    for(const id of ids){
      const el=document.getElementById(id);
      if(!el||el.disabled)continue;
+     for(let d=el.closest('details');d;d=d.parentElement?.closest('details'))d.open=true;
      el.scrollIntoView({block:'center',behavior:'smooth'});el.focus({preventScroll:true});
      el.setAttribute('data-focus-flash','1');setTimeout(()=>el.removeAttribute('data-focus-flash'),1800);
      return true;
@@ -115,12 +117,16 @@ export default function App(){
    selectedResistance:result.sizing.selected,exactResistance:result.sizing.exact});
  const exportResult=()=>{if(!p)return;const modelSnapshot=selectedParts(p.config,t).map(x=>({instanceId:x.instanceId,modelId:x.modelId,source:x.part.source,sourceRevision:SOURCES[x.part.source]?.revision??null,modelKind:x.part.modelKind??x.part.kind??null}));const report={schemaVersion:4,application:'LED-TR Analyzer',scope:'datasheet-based reduced DC model, not SPICE',inputDraft:config,designIntent:{mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy,criterion,tolerancePct},appliedConfiguration:p.config,modelSnapshot,result,corners,optical:p.optical,goal:goalView,editingGoal:result.sizing?.goal??null,appliedGoal:appliedGoal?{intent:appliedGoal.intent,selectedResistance:appliedGoal.selectedResistance,exactResistance:appliedGoal.exactResistance,configSnapshot:appliedGoal.snapshot,evaluation:evaluateGoal(p,appliedGoal.intent),drift:goalDrift(appliedGoal.snapshot,config)}:null,migrationNote:'v4 keeps the applied goal, its configuration snapshot and a live re-evaluation; v3 had only the sizing-time goal; v2 stored exact model IDs.'};const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='led-tr-analysis-v4.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  const number=(name,label,unit='',step='any')=><NumberField key={name} name={name} label={label} unit={unit} step={step} value={config[name]} onChange={v=>set(name,v)}/>;
+ const ratingSummary=`RLED 정격 ${show(config.resistorRating,1000,'mW')} × ${config.derating} = ${show(config.resistorRating*config.derating,1000,'mW')} · 주변 ${config.ambient}°C · 여유 경고 ${marginPct}%`;
+ const ledgerSummary=result.ok?`${p.ledger.length}개 소자 · ${result.validation.label}`:'';
  const q1=getDeviceModel(config.deviceModels?.Q1),sizeSupported=t.supportedOperations.includes('size');
  return<>
  <header className="topbar"><div className="top-inner"><a href="/" className="brand">InitusNovus</a><nav className="nav-links"><a href="/" className="back"><ArrowLeft size={16}/> Home</a><a href="https://github.com/InitusNovus/led-tr-analyzer" target="_blank" rel="noreferrer">Source <ExternalLink size={14}/></a></nav></div></header>
  <main className="shell">
   <div className="title-row"><div><div className="eyebrow"><Zap size={15}/> DATASHEET / DC</div><h1>LED-TR Analyzer</h1><p>실제 부품 모델과 회로 구조를 연결해 보는 축약 비선형 DC 분석기</p></div><div className="actions"><button onClick={reset}><RotateCcw size={15}/> 전체 초기화</button><button onClick={exportResult} disabled={!p}><Download size={15}/> 결과 JSON</button></div></div>
+  <ResultStrip point={p} validation={result.ok?result.validation:null} corners={corners} cornerPhase={phase} goal={goalView} config={config} marginPct={marginPct} error={result.ok?null:result.error}/>
   <section className="workbench">
+   <div className="setup-column">
    <div className="panel setup-panel"><h2>회로와 실제 부품</h2>
     <label className="field" htmlFor="topology"><span>토폴로지</span><select id="topology" value={config.topology} onChange={e=>changeTopology(e.target.value)}>{TOPOLOGIES.map(x=><option key={x.id} value={x.id}>{x.family} · {x.name}</option>)}</select></label>
     <p className="subtle">{t.path}<br/>토폴로지 전환 시 기본 ON 상태({t.active})로 설정됩니다.</p>
@@ -130,22 +136,7 @@ export default function App(){
     <div className="supply-grid">{number('vcc','VLED / collector rail','V')}{topologyUsesGPIO(t)&&number('vdd',config.deviceModels?.GPIO1==='assumed:DC-Thevenin'?'제어원 HIGH 전압':'GPIO 전원','V')}{number('seriesCount','직렬 LED','개',1)}{number('temperature','전기 모델 온도','°C')}</div>
     <div className="device-slots" id="device-slots">{t.deviceSlots.map(slot=><PartPicker key={slot.id} slot={slot} modelId={config.deviceModels?.[slot.id]??slot.defaultModelId} onChange={setDevice} onInspect={setSelectedInstance}/>)}</div>
    </div>
-   <div className="panel schematic-panel">
-    <div className="mobile-circuit-toolbar">
-      <label className="field" htmlFor="topology-mobile"><span>회로 빠른 선택</span><select id="topology-mobile" value={config.topology} onChange={e=>changeTopology(e.target.value)}>{TOPOLOGIES.map(x=><option key={x.id} value={x.id}>{x.family} · {x.name}</option>)}</select></label>
-    </div>
-    <CircuitDiagram config={config} point={p} selectedInstance={activeSelected} onSelectInstance={setSelectedInstance}/>
-    <div className="quick-results">{p?<><Metric label="LED 전류" value={show(p.current,1000,'mA')} hint={p.region}/><Metric label="LED Vf / 개" value={show(p.ledVf,1,'V')}/>{topologyUsesGPIO(t)&&<Metric label="GPIO 전류" value={show(p.gpioCurrent,1000,'mA')} hint="+ source / − sink"/>}<Metric label="Driver 손실" value={show(p.driverPower,1000,'mW')}/></>:<div className="quick-error"><strong>현재 조건 계산 불가</strong><span>{result.error?.message}</span></div>}</div>
-    <Inspector view={selectedView}/>
-    <DesignSummary config={p?.config??config} point={p} validation={result.ok?result.validation:null}
-     corners={corners} cornerPhase={phase} cornerProgress={cornerProgress} mode={mode} goal={goalView} marginPct={marginPct}
-     view={{mode,targetKind}} onInspect={setSelectedInstance} onFocusInput={focusInput} onSetConfig={set}/>
-   </div>
-  </section>
-
-  <section className="lower-grid">
-   <aside className="controls">
-    {topologyUsesGPIO(t)&&<section className="panel"><h2>GPIO 및 구동</h2><div className="fields two">
+    {topologyUsesGPIO(t)&&<section className="panel drive-panel"><h2>GPIO 및 구동</h2><div className="fields two">
       <label className="field" htmlFor="state"><span>출력 상태</span><select id="state" value={config.state} onChange={e=>set('state',e.target.value)}>{['HIGH','LOW','HI_Z'].map(s=><option key={s}>{s}</option>)}</select></label>
       <label className="field" htmlFor="gpio-mode"><span>출력 모드</span><select id="gpio-mode" value={config.gpioMode} onChange={e=>set('gpioMode',e.target.value)}><option value="push-pull">Push-pull</option><option value="open-drain">Open-drain</option></select></label>
       <label className="field" htmlFor="pull"><span>Hi-Z pull</span><select id="pull" value={config.pull} onChange={e=>set('pull',e.target.value)}><option value="none">없음</option><option value="up">Pull-up</option><option value="down">Pull-down</option></select></label>
@@ -159,7 +150,18 @@ export default function App(){
     {t.activeParameters.includes('gatePull')&&number('gatePull',t.id==='nmos-pmos'?'RGS(in/out) · 공용':t.id==='npn-pnp'?'RBE pull-up':'RGS / pull-up','Ω')}
     {q1?.family==='digital-npn'&&<div className="model-chip">Q1 {q1.id} · R1 {q1.r1}Ω · R2/R1 {config.dtcRatio}<br/>내부 저항 공차는 감도 분석에서 선택할 수 있습니다.</div>}
     </section>}
-    <section className="panel"><h2>계산 모드</h2><div className="tabs" role="group" aria-label="계산 모드"><button className={mode==='verify'?'active':''} onClick={()=>setMode('verify')}>저항으로 검증</button><button className={mode==='size'?'active':''} disabled={!sizeSupported} title={!sizeSupported?'이 회로는 RE로 전류를 설정합니다.':''} onClick={()=>setMode('size')}>목표에서 저항 선정</button></div>
+   </div>
+   <div className="main-column">
+   <div className="panel schematic-panel">
+    <div className="mobile-circuit-toolbar">
+      <label className="field" htmlFor="topology-mobile"><span>회로 빠른 선택</span><select id="topology-mobile" value={config.topology} onChange={e=>changeTopology(e.target.value)}>{TOPOLOGIES.map(x=><option key={x.id} value={x.id}>{x.family} · {x.name}</option>)}</select></label>
+    </div>
+    <CircuitDiagram config={config} point={p} selectedInstance={activeSelected} onSelectInstance={setSelectedInstance}/>
+    <div className="quick-results">{p?<><Metric label="LED 전류" value={show(p.current,1000,'mA')} hint={p.region}/><Metric label="LED Vf / 개" value={show(p.ledVf,1,'V')}/>{topologyUsesGPIO(t)&&<Metric label="GPIO 전류" value={show(p.gpioCurrent,1000,'mA')} hint="+ source / − sink"/>}<Metric label="Driver 손실" value={show(p.driverPower,1000,'mW')}/></>:<div className="quick-error"><strong>현재 조건 계산 불가</strong><span>{result.error?.message}</span></div>}</div>
+    <details className="fold inspector-fold" data-fold="inspector"><summary><b>선택 소자 {selectedView?selectedView.instanceId:'—'}</b><span className="fold-summary">{selectedView?(selectedView.part?.name??selectedView.label)+(selectedView.region?' · '+selectedView.region:''):'회로도에서 소자를 선택하세요'}</span></summary>
+     <Inspector view={selectedView}/></details>
+   </div>
+    <section className="panel control-card" id="control-card"><h2>계산 모드</h2><div className="tabs" role="group" aria-label="계산 모드"><button className={mode==='verify'?'active':''} onClick={()=>setMode('verify')}>저항으로 검증</button><button className={mode==='size'?'active':''} disabled={!sizeSupported} title={!sizeSupported?'이 회로는 RE로 전류를 설정합니다.':''} onClick={()=>setMode('size')}>목표에서 저항 선정</button></div>
      {!sizeSupported&&<p className="subtle">이 토폴로지는 RLED 자동 역산 대신 RE를 직접 설정해 검증합니다.</p>}
      {mode==='verify'?<NumberField name="resistance" label="RLED" unit="Ω" value={config.resistance} onChange={v=>set('resistance',v)}/>:<>
        <div className="fields two">
@@ -204,8 +206,7 @@ export default function App(){
   <button onClick={applyGoal}>검증 모드에 적용</button>
  </div>}
      </>}
-    </section>
-    <section className="panel" id="power-settings"><h2>정격·공차 입력 (오류가 나도 수정 가능)</h2>
+    <details className="fold rating-fold" id="power-settings"><summary><b>정격·공차·감도 입력</b><span className="fold-summary">{ratingSummary}</span></summary>
       <div className="fields two">
        <label className="field" htmlFor="package"><span>RLED generic 패키지 preset</span>
        <select id="package" value={Object.keys(PACKAGE_PRESETS).find(k=>PACKAGE_PRESETS[k]===config.resistorRating)??'custom'}
@@ -220,12 +221,24 @@ export default function App(){
        <NumberField name="marginPct" label="여유 경고 기준" unit="한계 대비 %" value={marginPct} onChange={setMarginPct}/>
       </div>
       <p className="subtle">Generic preset은 실제 모든 해당 크기 저항의 정격을 보증하지 않습니다.</p>
+     <h3 className="fold-sub">공차 · 감도</h3>
+    <div className="fields two">{number('vccTolerance','VLED 변동','±%')}{topologyUsesGPIO(t)&&number('vddTolerance','GPIO 전원 변동','±%')}{number('resistorTolerance','RLED 공차','±%')}{number('vfSpread','LED Vf 이동 가정','±V')}</div>
+     <div className="tolerance-presets" role="group" aria-label="공차 빠른 선택">
+       {[[5,'J ±5%'],[2,'G ±2%'],[1,'F ±1%'],[.1,'B ±0.1%']].map(([v,label])=>
+        <button key={v} onClick={()=>set('resistorTolerance',v)}>{label}</button>)}
+      </div>
+      <p className="subtle">E-series는 표준값 계열이며 실제 부품 공차와 독립입니다.</p>
+     {q1?.family==='digital-npn'&&<label className="check"><input id="include-dtc" type="checkbox" checked={includeDtc} onChange={e=>{setIncludeDtc(e.target.checked);setCornerSnapshot(null);}}/> Q1 R1 및 R2/R1 공차 포함</label>}
+     <button className="primary" disabled={!p||manualRunning} onClick={runManual}>{manualRunning?'분석 중…':'현재 조건 분석'}</button>
+     <p className="subtle">{autoCorners?'기본 표본(공차 축 곱)은 입력이 멈추면 자동으로 계산합니다. 버튼은 다시 실행할 때 씁니다.':'DTC 내부 공차를 포함한 확장 분석은 느리므로 직접 실행합니다.'}</p>
+    </details>
     </section>
-   </aside>
-
-   <div className="results-column">
-
-    {!result.ok?<section className="notice error" role="alert"><h2>계산할 수 없는 조건</h2><p>{result.error.message}</p><small>{result.error.code}</small></section>:<>
+    {!result.ok&&<section className="notice error" role="alert"><h2>계산할 수 없는 조건</h2><p>{result.error.message}</p><small>{result.error.code}</small></section>}
+    <DesignSummary config={p?.config??config} point={p} validation={result.ok?result.validation:null}
+     corners={corners} cornerPhase={phase} cornerProgress={cornerProgress} mode={mode} goal={goalView} marginPct={marginPct}
+     view={{mode,targetKind}} onInspect={setSelectedInstance} onFocusInput={focusInput} onSetConfig={set}/>
+    <section className="panel fold-group" aria-label="상세"><h2>상세</h2>
+     {result.ok&&<details className="fold" data-fold="report"><summary><b>동작점 · 소자별 전력</b><span className="fold-summary">{ledgerSummary}</span></summary>
      <section className="panel report" aria-label="동작점 결과" aria-live="polite"><div className="report-head"><h2>동작점</h2><span className={'status '+result.validation.status}>{result.validation.label}</span></div><div className="metrics">
       <Metric label="LED 전류" value={show(p.current,1000,'mA')} hint={p.region+' · DC'}/><Metric label="LED 전압 / 개" value={show(p.ledVf,1,'V')}/>
       {topologyUsesGPIO(t)&&<><Metric label="GPIO 전류 (+source / −sink)" value={show(p.gpioCurrent,1000,'mA')}/><Metric label="GPIO 단자 전압" value={show(p.gpioVoltage,1,'V')}/></>}
@@ -240,21 +253,17 @@ export default function App(){
       <details><summary>전체 한계 검사</summary><div className="table-scroll"><table><thead><tr><th>항목</th><th>계산값</th><th>한계</th><th>상태</th></tr></thead><tbody>{result.validation.checks.map(x=><tr key={x.id} className={x.status==='exceeded'?'limit-error':''}><th title={x.condition}>{x.id}</th><td>{show(x.actual,x.unit==='A'||x.unit==='W'?1000:1,x.unit==='A'?'mA':x.unit==='W'?'mW':x.unit)}</td>
  <td>{show(x.limit,x.unit==='A'||x.unit==='W'?1000:1,x.unit==='A'?'mA':x.unit==='W'?'mW':x.unit)}</td><td>{x.status}</td></tr>)}</tbody></table></div></details>
      </section>
-    </>}
-    <section className="panel"><h2>공차 · 감도 분석</h2><div className="fields two">{number('vccTolerance','VLED 변동','±%')}{topologyUsesGPIO(t)&&number('vddTolerance','GPIO 전원 변동','±%')}{number('resistorTolerance','RLED 공차','±%')}{number('vfSpread','LED Vf 이동 가정','±V')}</div>
-     <div className="tolerance-presets" role="group" aria-label="공차 빠른 선택">
-       {[[5,'J ±5%'],[2,'G ±2%'],[1,'F ±1%'],[.1,'B ±0.1%']].map(([v,label])=>
-        <button key={v} onClick={()=>set('resistorTolerance',v)}>{label}</button>)}
-      </div>
-      <p className="subtle">E-series는 표준값 계열이며 실제 부품 공차와 독립입니다.</p>
-     {q1?.family==='digital-npn'&&<label className="check"><input id="include-dtc" type="checkbox" checked={includeDtc} onChange={e=>{setIncludeDtc(e.target.checked);setCornerSnapshot(null);}}/> Q1 R1 및 R2/R1 공차 포함</label>}
-     <button className="primary" disabled={!p||manualRunning} onClick={runManual}>{manualRunning?'분석 중…':'현재 조건 분석'}</button>
-     <p className="subtle">{autoCorners?'기본 표본(공차 축 곱)은 입력이 멈추면 자동으로 계산합니다. 버튼은 다시 실행할 때 씁니다.':'DTC 내부 공차를 포함한 확장 분석은 느리므로 직접 실행합니다.'}</p>
+     </details>}
+     <details className="fold" data-fold="sensitivity"><summary><b>감도 상세 (극값 조건 표)</b><span className="fold-summary">{corners?(corners.error?'계산 오류':corners.validCount+'/'+corners.count+'개 조건 계산'):'아직 계산 전'}</span></summary>
      {corners&&(corners.error?<p role="alert">{corners.error}</p>:<div className="corner-results"><p>{corners.validCount}/{corners.count} 조건 계산 · {corners.failures.length}개 미지원/실패 · {corners.failures.length?'일부 조건 제외됨':corners.anyExceeded?'한계 초과 조건 있음':'계산한 표본의 검사 완료'}</p>
        <SensitivityWitness corners={corners} point={p} config={p.config}/></div>)}
-    </section>
+      {!corners&&<p className="subtle">공차 입력을 바꾸면 자동으로 계산합니다.</p>}
+     </details>
+     <details className="fold" data-fold="evidence"><summary><b>선택 부품의 데이터 근거</b><span className="fold-summary">{parts.length}개 소자</span></summary>
     <section className="panel"><h2>선택 부품의 데이터 근거</h2><div className="evidence-grid">{parts.map(({instanceId,role,modelId,part})=>{const ev=partEvidence(part),src=ev?.source;return<article className="evidence-card" key={instanceId}><div><b>{instanceId}</b><span>{role}</span></div><strong>{part.name??part.id}</strong><small>{ev?.modelKind}</small>{src&&(src.url?<a href={src.url} target="_blank" rel="noreferrer">{src.manufacturer} · {src.revision} <ExternalLink size={12}/></a>:
    <span>{src.manufacturer} · 제조사 정격 없음</span>)}<p>{part.notes?.[0]??'등록된 모델 데이터'}</p></article>;})}</div></section>
+     </details>
+    </section>
    </div>
   </section>
   <footer>DC 축약 모델 · SPICE/IBIS 없음 · 제작 전 원문 데이터시트와 실측 확인</footer>
