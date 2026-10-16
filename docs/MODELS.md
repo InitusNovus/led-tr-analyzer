@@ -36,11 +36,11 @@
 | KT-0805O | C110371 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 1.8–2.4V @10mA; IV 70–175mcd @20mA; IF 25mA; Pd 40mW |
 | KT-0805W | C34499 | C34499-associated KENTO A3, 2017-05-16을 pin | Vf 2.6–3.2V @5mA; IV typ 350mcd @5mA; IF 25mA; Pd 80mW |
 
-R/G/B/YG/O는 같은 원문에 실린 Typical Electrical-Optical Characteristics Curves를 거칠게 수동 판독하여 `manual-curve`로 사용합니다. 곡선은 전형값이며 생산 분포의 보증곡선이 아닙니다. R/YG/O의 p.3 Vf 행은 10mA인데 p.4 voltage-bin 표는20mA이므로 서로 다른 시험조건으로 따로 저장합니다.
+R/G/B/YG/O는 같은 원문에 실린 Typical Electrical-Optical Characteristics Curves를 거칠게 수동 판독하여 `manual-curve`로 사용합니다. 곡선은 전형값이며 생산 분포의 보증곡선이 아닙니다. R/YG/O의 p.3 Vf 행은 10mA인데 p.4 voltage-bin 표는 20mA이므로 서로 다른 시험조건으로 따로 저장합니다.
 
 Y는 source identity와 LCSC/JLCPCB에서 노출되는 Vf 1.8–2.4V, 175mcd, 40mW, −40…85°C는 확인했지만, 현재 접근 가능한 원문에서 Vf/IV 시험전류와 IF/IFP/VR 행을 신뢰성 있게 추출하지 못했습니다. 따라서 형제 KT 품번의 값을 복사하지 않고 해당 항목은 unknown으로 둡니다. `datasheet-table-only`의 2.1V midpoint는 **명시적 계산 가정**이며 모든 전류에서 current-shape 미모델링 플래그를 냅니다.
 
-White C34499는 웹의 다른 mirror에 같은 제품명/비슷한 revision을 가진 사본이 있으나 Pd, IF 및 광학 시험조건이 C34499-associated LCSC 문서와 충돌합니다. 이 모델은 **LCSC에 직접 연결된 A3 2017-05-16 문서**만 pin하고 다른 mirror의 숫자를 합치지 않습니다. 동일 source의 current-dependence curve를 이번 PR에서 확인하지 못했으므로 Vf는 2.6–3.2V의 midpoint 2.9V를 명시적 table-only 가정으로 사용하고, 광도 350mcd는 정확히5mA/25°C 시험점에서만 반환합니다.
+White C34499는 웹의 다른 mirror에 같은 제품명/비슷한 revision을 가진 사본이 있으나 Pd, IF 및 광학 시험조건이 C34499-associated LCSC 문서와 충돌합니다. 이 모델은 **LCSC에 직접 연결된 A3 2017-05-16 문서**만 pin하고 다른 mirror의 숫자를 합치지 않습니다. 동일 source의 current-dependence curve를 이번 PR에서 확인하지 못했으므로 Vf는 2.6–3.2V의 midpoint 2.9V를 명시적 table-only 가정으로 사용하고, 광도 350mcd는 정확히 5mA/25°C 시험점에서만 반환합니다.
 
 R/G/B/YG/Y/O의 데이터시트 광도는 min/max bin 범위이고 단일 typ 절대광도가 아닙니다. 상대 광도 곡선은 보관하더라도 그 범위를 임의의 midpoint “typ mcd”로 바꾸지 않으며, 현재 UI의 scalar mcd 출력은 `null`입니다. 추후 bin 선택/범위 출력 UI를 별도 구현할 수 있습니다.
 
@@ -134,6 +134,17 @@ Iv_max_est(I) = Iv_max(I_test) * scale(I)
 
 저항 역산은 `optical basis → I_target → 동일 DC topology solver → E-series → 실제 선정 저항의 optical` 순으로 진행합니다. `safe`(큰 저항) 반올림이 최소 광도 목표 미달로 이어질 수 있으므로 목표 달성을 재확인합니다.
 
+### 목표 판정 (`src/core/goal.js`)
+
+`evaluateGoal(point, intent)`는 저항 선정 모드와 검증 모드가 함께 쓰는 순수 함수입니다. 판정 기준은 둘 중 하나입니다.
+
+- `minimum`: `achieved ≥ target` (상대 허용 1e-7). 초과는 충족이며 '정확 일치'를 뜻하지 않습니다.
+- `approximate`: `|achieved − target| ≤ target × tolerancePct/100`. 초과도 허용 범위를 벗어나면 미달입니다.
+
+`status`는 `met` / `missed` / `unavailable`(선택 기준을 모델이 표현하지 못함, 예: 광도 근거 없는 LED) / `not-computed`(동작점 없음)이며, 오차는 `achieved − target`과 target 대비 %로 함께 반환합니다.
+
+`검증 모드에 적용`은 목표 intent와 적용 시점 구성(snapshot)을 보관합니다. 검증 모드는 snapshot의 결과를 재사용하지 않고 **현재 구성으로 다시 평가**하며, `goalDrift()`가 snapshot과 달라진 동작점 입력(토폴로지, LED, 부품 model ID, 전원, 저항, 구동 상태 등)을 나열합니다. 공차·정격·주변온도 입력은 동작점을 바꾸지 않으므로 목록에 넣지 않습니다.
+
 `opticalUsageGuide()`는 초기 버전의 mcd 숫자 해석을 돕는 **비정량적 실무 가이드**이며 광도·정격 solver의 입력이 아닙니다. 상대 광도는 눈으로 느끼는 밝기와 일대일 대응하지 않으며 색·거리·시야각·주변조도·광학구조·PWM을 모델링하지 않습니다.
 
 ## 사용자 가정 독립 제어원과 canonical 검사 (이슈 #21)
@@ -143,5 +154,67 @@ Iv_max_est(I) = Iv_max(I_test) * scale(I)
 `checkLimits()`는 기존 사용자 표시 이름 `id`와 별개로 `ruleId`, `instanceId`, `metric`, `unit`, `scope`, `basis`를 반환합니다. 회로 템플릿과 ledger의 `RGS_IN/RGS_OUT` 식별자를 동일하게 사용합니다. 동작점이 계산되지 않아도 각 회로의 정적 instance는 `buildInstanceViews()`에 존재합니다. 다른 Q1으로 무음 fallback하지 않습니다.
 
 Nominal 검사와 `analyzeCorners()`의 sampled extrema 및 위반 witness는 **서로 다른 scope**이며, sampled에서 일부 실패한 경우 전체 범위가 검증된 것으로 표시하지 않습니다. Optical bin range(동일 전류의 광학 범위)와 optical sampled range(여러 전기 조건으로 달라진 범위)도 별도의 개념입니다. 독립 광도/mA 목표 draft를 저장하므로 단위를 바꾸거나 미지원 LED로 전환해도 숫자를 잘못 재사용하지 않습니다.
+
+### 동작점 전압 예산과 구동 (`src/core/qpoint.js`)
+
+`qPointSummary(point)`는 풀이가 이미 낸 동작점을 읽어 전압 루프로 묶습니다. 새 회로식을 만들지 않으며, 각 루프는 `rail = Σ 항`이고 `residual`을 함께 반환합니다.
+
+| 토폴로지 | 부하 경로 (rail) | 구동 경로 |
+|---|---|---|
+| 저항 직결 | VLED = VRLED + n·Vf | — |
+| GPIO Source | VDD = GPIO 출력 강하 + VRLED + n·Vf | (부하 경로에 포함) |
+| GPIO Sink | VLED = VRLED + n·Vf + 핀 전압 | (부하 경로에 포함) |
+| digital NPN / NPN 로우사이드 / NMOS 로우사이드 | VLED = VRLED + n·Vf + VCE 또는 VDS | 핀 = II·R1 + VBE / IB·RB + VBE / IRG·RG + VGS |
+| NPN 에미터 팔로워 | VLED = VCE + VRLED + n·Vf (LED·RLED는 **IE**, VCE 항은 **IC**) | 핀 = IB·RB + VBE + VE |
+| NPN 에미터 저항 전류 싱크 | VLED = VRLED + n·Vf + VCE + **IE·RE** | 핀 = IB·RB + VBE + VE |
+| PNP / PMOS 하이사이드 (직접) | VLED = VEC 또는 VSD + VRLED + n·Vf | VLED = VEB + IB·RB + 핀 / VLED = VRGS + VRG + 핀 |
+| NPN→PNP / NPN→PMOS / NMOS→PMOS | VLED = Q2 강하 + VRLED + n·Vf | ① 핀 = Q1 입력 루프 ② VLED = Q2 구동(VEB 또는 RGS_OUT) + Rdrive·j + Q1 VCE/VDS |
+
+BJT 행에는 `IC`, `IB`, `IE`, 실제 `IC/IB`, 그 IC에서의 `hFE`(데이터시트 gain 곡선), 데이터시트 VCE(sat) 시험 `IC/IB`와 근거 figure·조건이 들어갑니다. BC847B는 VCE(sat) 곡선이 IC/IB=20, VBE(sat) 곡선이 IC/IB=10이라 `ratioMismatch`로 표시합니다. 활성 영역의 IC/IB는 hFE를 따르며, 에미터 팔로워·전류 싱크에서는 의도된 동작이므로 불량으로 판정하지 않습니다. **IC/IB 합격선(β≤10/20)은 없습니다.**
+
+DTC 행은 네 값을 구분합니다. `IO/II`는 외부 단자 전류비(ROHM GI 및 IO/II=10 기준의 VO(on) 곡선과 같은 정의), `II`는 R1을 지나는 외부 입력 전류, `IB`는 R2로 빠지는 전류 `VBE/R2`를 뺀 내부 베이스 전류, `IC/IB`는 그 내부 베이스 기준 비율입니다. 기본 회로에서 II≈0.5441mA, IB≈0.5289mA, IO/II≈16.53, IC/IB≈17.01입니다.
+
+OFF(전류 0)에서는 누설을 모델링하지 않고 소자 전압은 상한만 알 수 있으므로 분담과 구동비를 만들지 않고 안내만 표시합니다. 베이스 부유(Hi-Z, pull 없음)나 전압 도메인이 다른 OFF처럼 모델이 정하지 못하는 조건은 솔버가 `unsupported`로 거절하므로 요약 자체가 만들어지지 않습니다. 이 요약은 SPICE 수준의 전하 저장·과도 해석을 포함하지 않습니다.
+
+### 경고 분류와 입력 연결 (`src/core/warnings.js`)
+
+경고는 새 합격선을 만들지 않고, 정격 검사(`checkLimits`)와 sampled 위반 그룹을 분류해서 보여줍니다.
+
+| 심각도 | 근거 | 범위 |
+|---|---|---|
+| `exceeded` 한계 초과 | 정격 검사가 `exceeded` | `nominal`은 계산한 동작점, `sampled`는 표본 시나리오 |
+| `margin` 여유 부족 | 정격 검사가 `within`이고 `actual/limit`이 **사용자가 정한 기준(기본 90%)** 이상. 단위가 A·W·V인 항목만 (온도 비율은 의미가 없음). 기준을 비우면 끔 | nominal |
+| `unknown` 정격 미확인 | 한계 데이터가 없어 검사하지 못함 | nominal |
+| `approximation` 모델 근사 | 솔버 플래그(외삽, 근사, 미모델링) | — |
+
+`margin`은 판정이 아니라 알림입니다. 기준을 바꿔도 정격 검사 결과(`within-entered-limits` 등)는 바뀌지 않고 동작점 입력도 아니므로 감도 분석 결과를 무효화하지 않습니다.
+
+Sampled 초과는 `analyzeCorners()`의 `violationGroups`(규칙·소자별, **전체 표본 기준**이라 30개로 잘린 `violations`와 다름)로 만듭니다. 각 그룹은 초과한 시나리오 수와 최악 시나리오를 갖고, 화면에는 공칭과 달라진 축만 표시합니다. 일부 시나리오가 모델 적용범위 밖이면 "계산한 N개 기준이며 전체 범위의 보증이 아닙니다"를 함께 표시합니다.
+
+`relatedInputs(check, config, view)`는 규칙별로 효과가 있는 입력을 가장 직접적인 것부터 나열하고, 현재 토폴로지가 실제로 보여주는 입력만 남깁니다. 검증 모드에서는 `RLED`, 선정 모드에서는 목표 전류/광도 입력이 같은 자리를 대신합니다. 예: RLED 전력 예산 → RLED 실제 정격 · 사용 비율 · RLED · VLED, 전류 싱크의 LED 전류 → RE 먼저, GPIO 합계 전류 → 다른 핀 합계 입력. 새 정격 규칙이 추가되면 `tests/warnings.test.js`가 매핑 누락을 잡습니다.
+
+전력 예산(`powerBudget`)은 `예산 = 정격 × 사용 비율`, `필요 정격 = 기준 전력 ÷ 사용 비율`이며 기준 전력은 sampled peak가 있으면 그 값, 없으면 nominal입니다. Generic preset은 **정격 오름차순**으로 비교합니다(객체 키 순서로 순회하면 정수처럼 보이는 `1206`이 맨 앞에 와서 항상 1206을 추천하던 버그가 있었습니다).
+
+### 감도 분석 실행 정책과 응답성
+
+`analyzeCorners()`는 `planCorners()`(시나리오 격자와 축 정보) → `evaluateCorner()`(시나리오 1개) → `summarizeCorners()`(극값·위반·광도 범위)로 나뉘고, 한 번에 실행해도 같은 결과를 냅니다. 화면은 `src/ui/cornerRunner.js`가 약 12ms 단위로 UI 스레드를 양보하며 실행하고, 입력이 바뀌면 취소합니다.
+
+- **기본 표본**(VLED·GPIO 전원·RLED·Vf 이동 각 3점, 최대 81개)은 입력이 250ms 멈추면 자동으로 계산합니다.
+- **DTC 확장**(R1 배율·R2/R1 추가, 729개)은 직접 실행합니다.
+- 결과 상태는 `unavailable`(동작점 없음) · `idle`(미실행) · `running`(계산 중, 진행률 표시) · `stale`(입력이 바뀌어 무효, 수동 모드) · `error` · `partial`(일부 조건 제외) · `complete`입니다. 이전 입력의 결과는 현재 값처럼 표시하지 않습니다.
+- 결과에는 스윕한 축(`axes.swept`)과 공칭값으로 둔 조건(`axes.fixed`)이 들어 있어 Min/Max를 보증 worst case로 읽지 않게 합니다. 광도는 `opticalSpread`로 bin 범위(공칭 전류), 전기 조건 변동만(대표값 기준), 둘을 결합한 추정을 분리합니다.
+
+**측정** (`node scripts/measure_sensitivity.mjs`, `python scripts/measure_ui_stall.py`; 이 개발 환경의 값이며 기기마다 다릅니다). 시나리오당 비용은 토폴로지마다 크게 다릅니다.
+
+| 구성 | 시나리오 | 한 번에 계산 (중앙값) |
+|---|---|---|
+| 저항 직결 | 27 | 약 2ms |
+| GPIO / digital NPN / NMOS / PMOS | 81 | 약 5–15ms |
+| NPN 로우사이드 / PNP 하이사이드 / 레벨 시프트 | 81 | 약 17–39ms |
+| **NPN 에미터 팔로워** | 81 | **약 240ms** |
+| **NPN 에미터 저항 전류 싱크** | 81 | **약 380ms** |
+| digital NPN + DTC 확장 | 729 | 약 110ms |
+
+한 번에 동기 계산하면 에미터 팔로워·전류 싱크에서 입력을 멈출 때마다 UI가 0.25–0.35초 멈췄습니다(브라우저 측정: 최악 정지 254ms / 349ms). 시간 예산 방식으로 바꾼 뒤 같은 조작의 최악 정지는 약 33ms / 32ms(digital NPN은 38ms → 16ms)입니다.
 
 모든 모드에서 정격 입력은 계산 결과 조건문 밖에서 렌더링하고, 빈칸은 0으로 강제 대체하지 않고 필드 오류 및 유효하지 않은 계산 상태로 취급합니다. JSON `schemaVersion:3`에서 `designIntent`과 `optical` 구조화 근거를 내보냅니다.

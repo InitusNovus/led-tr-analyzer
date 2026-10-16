@@ -118,3 +118,29 @@ export function buildInstanceViews(config,point,validation) {
   }
   return [...map.values()];
 }
+
+export const GOAL_BASIS_LABEL = { min: '최저 bin 기준 추정', typ: '제조사 typ anchor 기준', representative: '중간 대표값 가정' };
+/** One-line verdict that names the rule used, so a minimum threshold is never read as an exact-target match. */
+export const goalVerdict = g => g.status === 'unavailable' ? '현재 구성에서는 이 기준으로 평가할 수 없음'
+    : g.status === 'not-computed' ? '현재 조건에서 동작점을 계산할 수 없음'
+    : g.criterion === 'approximate' ? (g.met ? '목표 ±' + g.tolerancePct + '% 이내' : '허용 오차 ±' + g.tolerancePct + '% 밖')
+    : (g.met ? '최소 목표 이상 충족' : '최소 목표 미달');
+
+/** Lifecycle of the sampled sensitivity result for the current inputs; never inferred from stale data. */
+export const cornerPhase = ({ hasPoint, corners, hasSnapshot, stale, running }) =>
+    !hasPoint ? 'unavailable'
+    : corners ? (corners.error ? 'error' : corners.failures?.length ? 'partial' : 'complete')
+    : running ? 'running'
+    : (hasSnapshot || stale) ? 'stale' : 'idle';
+export const CORNER_PHASE_TEXT = {
+    unavailable: '동작점 미계산', idle: '미실행', running: '계산 중…', stale: '입력 변경됨 · 다시 실행 필요',
+    error: '분석 실패', partial: '일부 조건 미지원', complete: '완료',
+};
+
+/** Quantity in the unit the UI uses (mA, mW, V, ...); SI inside the core. */
+export const formatQuantity = (value, unit) => {
+    if (value == null || !Number.isFinite(value)) return '—';
+    const [scale, label] = unit === 'A' ? [1000, 'mA'] : unit === 'W' ? [1000, 'mW'] : [1, unit ?? ''];
+    return (value * scale).toLocaleString('en-US', { maximumSignificantDigits: 4 }) + (label ? ' ' + label : '');
+};
+export const formatSigned = (value, unit) => (value >= 0 ? '+' : '−') + formatQuantity(Math.abs(value), unit);

@@ -1,8 +1,9 @@
 import { ModelError, finite, bisect, standardResistor, unique } from './math.js';
-import { normalizeConfig, solvePoint, topologyById, topologyUsesGPIO } from './topologies.js';
+import { normalizeConfig, solvePoint, topologyById, topologyUsesGPIO, activeParameterNames } from './topologies.js';
 import { LEDS, getDeviceModel } from '../data/catalog.js';
 import { context, sample } from './devices.js';
-import { solveOpticalCurrent, opticalValueForBasis, opticalCapability } from './optics.js';
+import { solveOpticalCurrent, opticalCapability, opticalValueForBasis } from './optics.js';
+import { evaluateGoal, normalizeCriterion } from './goal.js';
 /** Canonical validation IDs are independent from translated user-facing labels. */
 export function checkLimits(point) {
     const c=point.config,led=LEDS[c.led],checks=[],t=topologyById(c.topology);
@@ -41,7 +42,7 @@ export function checkLimits(point) {
         if(p.thermalResistance)limit=Math.min(limit??Infinity,(p.limits.maxJunction-c.ambient)/p.thermalResistance);
         else if(p.limits.deratePerC)limit=p.limits.power-p.limits.deratePerC*Math.max(0,c.ambient-25);
         else if(c.ambient>25)limit=null;
-        add(q.id+' power budget',id,'transistor-power-budget','power','W',q.power,limit==null?null:Math.max(0,limit),p.thermalCondition??'Reference lands at25°C; no derived thermal impedance');
+        add(q.id+' power budget',id,'transistor-power-budget','power','W',q.power,limit==null?null:Math.max(0,limit),p.thermalCondition??'Reference lands at 25°C; no derived thermal impedance');
     }
     const exceeded=checks.filter(x=>x.status==='exceeded'),unknown=checks.filter(x=>x.status==='unknown');
     return{checks,status:exceeded.length?'limits-exceeded':unknown.length?'unverified-limits':'within-entered-limits',
@@ -51,7 +52,21 @@ export function analyzePoint(input){
     try{const point=solvePoint(input);return{ok:true,point,validation:checkLimits(point)};}
     catch(error){if(error instanceof ModelError)return{ok:false,error:{code:error.code,message:error.message}};throw error;}
 }
-export function analyzeCorners(input,{includeDtc=false}={}){
+const RESISTOR_PARAMETERS={baseResistance:'RB',emitterResistance:'RE',gateResistance:'RG',gatePull:'RGS',pullResistance:'GPIO pull',sourceResistance:'제어원 Rout'};
+/** What a sampled sensitivity run deliberately leaves at its nominal value, so Min/Max is never read as a full worst case. */
+function fixedSensitivityAxes(c,allAxes,{includeDtc,q1}){
+    const topology=topologyById(c.topology),sweptKeys=new Set(allAxes.filter(a=>a.values.length>1).map(a=>a.key)),fixed=[];
+    for(const name of activeParameterNames(topology,c))
+        if(RESISTOR_PARAMETERS[name]&&!sweptKeys.has(name))fixed.push({key:name,label:RESISTOR_PARAMETERS[name]+' 공칭값',value:c[name],unit:'Ω'});
+    if(q1?.family==='digital-npn'&&!includeDtc)fixed.push({key:'dtcTolerance',label:'Q1 내부 R1·R2/R1 공차 (확장 분석에서만 스윕)',value:null,unit:''});
+    fixed.push({key:'temperature',label:'전기 모델 온도',value:c.temperature,unit:'°C'},
+        {key:'device-curves',label:'LED·TR·GPIO 전형 곡선 (제조 편차 미반영)',value:null,unit:''});
+    for(const a of allAxes)if(a.values.length<2&&(a.key!=='vdd'||topologyUsesGPIO(topology)))
+        fixed.push({key:a.key,label:a.label+' (공차 0%로 고정)',value:a.nominal,unit:a.unit});
+    return fixed;
+}
+/** Scenario grid and axis metadata for a sampled run; separated from evaluation so a run can be chunked and cancelled. */
+export function planCorners(input,{includeDtc=false}={}){
     const c=normalizeConfig(input),axes=[
         ['vcc',unique([c.vcc*(1-c.vccTolerance/100),c.vcc,c.vcc*(1+c.vccTolerance/100)])],
         ['vdd',topologyUsesGPIO(topologyById(c.topology))?unique([c.vdd*(1-c.vddTolerance/100),c.vdd,c.vdd*(1+c.vddTolerance/100)]):[c.vdd]],
@@ -62,9 +77,20 @@ export function analyzeCorners(input,{includeDtc=false}={}){
     if(includeDtc&&q1?.family==='digital-npn'){
         axes.push(['dtcR1Scale',unique([q1.r1Range[0]/q1.r1,1,q1.r1Range[1]/q1.r1])],['dtcRatio',unique([q1.ratioRange[0],q1.ratio,q1.ratioRange[1]])]);
     }
+    const nominalOf={vcc:c.vcc,vdd:c.vdd,resistance:c.resistance,vfShift:c.vfShift,dtcR1Scale:1,dtcRatio:q1?.ratio};
+    const AXIS_LABEL={vcc:['VLED','V'],vdd:['GPIO 전원','V'],resistance:['RLED','Ω'],vfShift:['LED Vf 이동','V'],dtcR1Scale:['Q1 R1 배율','×'],dtcRatio:['Q1 R2/R1','']};
+    const allAxes=axes.map(([key,values])=>({key,label:AXIS_LABEL[key][0],unit:AXIS_LABEL[key][1],values,nominal:nominalOf[key]}));
+    const sweptAxes=allAxes.filter(a=>a.values.length>1),fixedAxes=fixedSensitivityAxes(c,allAxes,{includeDtc,q1});
     let scenarios=[{}];for(const[k,vs]of axes)scenarios=scenarios.flatMap(s=>vs.map(v=>({...s,[k]:v})));
-    const samples=[],failures=[];
-    for(const scenario of scenarios){const a=analyzePoint({...c,...scenario});if(a.ok)samples.push({scenario,point:a.point,validation:a.validation});else failures.push({scenario,error:a.error});}
+    return{config:c,includeDtc,scenarios,axes:{swept:sweptAxes,fixed:fixedAxes}};
+}
+export function evaluateCorner(plan,index){
+    const scenario=plan.scenarios[index],a=analyzePoint({...plan.config,...scenario});
+    return a.ok?{scenario,point:a.point,validation:a.validation}:{scenario,failure:{scenario,error:a.error}};
+}
+export function summarizeCorners(plan,outcomes){
+    const c=plan.config;
+    const samples=outcomes.filter(o=>!o.failure),failures=outcomes.filter(o=>o.failure).map(o=>o.failure);
     const extrema={};
     for(const metric of ['current','resistorPower','driverPower','inputPower']){
         if(!samples.length){extrema[metric]=null;continue;}
@@ -73,6 +99,20 @@ export function analyzeCorners(input,{includeDtc=false}={}){
     }
     const violations=samples.flatMap((s,idx)=>s.validation.checks.filter(check=>check.status==='exceeded')
        .map(check=>({scenario:s.scenario,scenarioId:'sample-'+idx,check:{...check,scope:'scenario'}})));
+    // Grouped over every sample (violations above is truncated): per rule and instance, how many scenarios exceed
+    // and which one is worst, so the UI can name a cause instead of dumping scenarios.
+    const groups=new Map();
+    samples.forEach((s,idx)=>{
+        for(const check of s.validation.checks){
+            if(check.status!=='exceeded')continue;
+            const key=check.ruleId+'|'+check.instanceId+'|'+check.id,ratio=check.limit>0?check.actual/check.limit:Infinity;
+            const g=groups.get(key)??{key,ruleId:check.ruleId,instanceId:check.instanceId,id:check.id,metric:check.metric,unit:check.unit,limit:check.limit,
+                condition:check.condition,count:0,worst:null};
+            g.count++;
+            if(!g.worst||ratio>g.worst.ratio)g.worst={actual:check.actual,ratio,scenario:s.scenario,scenarioId:'sample-'+idx};
+            groups.set(key,g);
+        }
+    });
     const opticalAvailable=samples.filter(s=>s.point.optical?.kind!=='unavailable');
     const opticalRange=opticalAvailable.length?{
        min:Math.min(...opticalAvailable.map(s=>s.point.optical.minMcd??s.point.optical.nominalMcd).filter(Number.isFinite)),
@@ -80,12 +120,31 @@ export function analyzeCorners(input,{includeDtc=false}={}){
        validCount:opticalAvailable.length,
        kind:'sampled-electrical-scenarios-plus-optical-bin-range'
     }:null;
-    return{kind:'sampled-sensitivity',count:scenarios.length,validCount:samples.length,failures,extrema,
-        opticalRange,violations:violations.slice(0,30),violationCount:violations.length,
+    const nominal=analyzePoint(c);
+    const typicalOf=o=>opticalValueForBasis(o,'typ')??opticalValueForBasis(o,'representative');
+    const electricalValues=opticalAvailable.map(s=>typicalOf(s.point.optical)).filter(Number.isFinite);
+    const nominalOptical=nominal.ok?nominal.point.optical:null;
+    // Bin spread (manufacturer test-point range at the nominal current) and the spread caused by the sampled electrical
+    // scenarios alone (one representative value per scenario) are different things; the combined range mixes both.
+    const opticalSpread={
+        binAtNominal:nominalOptical&&nominalOptical.kind!=='unavailable'&&Number.isFinite(nominalOptical.minMcd)&&Number.isFinite(nominalOptical.maxMcd)
+            ?{min:nominalOptical.minMcd,max:nominalOptical.maxMcd}:null,
+        electricalOnly:electricalValues.length?{min:Math.min(...electricalValues),max:Math.max(...electricalValues),
+            basis:Number.isFinite(opticalValueForBasis(opticalAvailable[0].point.optical,'typ'))?'typ':'representative'}:null,
+        combined:opticalRange,
+    };
+    return{kind:'sampled-sensitivity',count:plan.scenarios.length,validCount:samples.length,failures,extrema,
+        axes:plan.axes,opticalSpread,
+        opticalRange,violations:violations.slice(0,30),violationCount:violations.length,violationGroups:[...groups.values()],
         anyExceeded:violations.length>0,
         flags:unique(samples.flatMap(s=>s.point.flags)),note:'Vf offset is user-assumed. Typical device curves are held fixed. Sampled extrema are not guaranteed process/thermal worst cases. RB/RE and auxiliary resistors are nominal; RLED tolerance is swept only.'};
 }
-export function selectResistance(input,targetCurrent,{series='E24+E96',strategy='closest',targetMcd=null,opticalBasis='auto'}={}){
+export function analyzeCorners(input,opts){
+    const plan=planCorners(input,opts);
+    return summarizeCorners(plan,plan.scenarios.map((_,i)=>evaluateCorner(plan,i)));
+}
+export function selectResistance(input,targetCurrent,{series='E24+E96',strategy='closest',targetMcd=null,opticalBasis='auto',criterion='minimum',tolerancePct}={}){
+    const goalRule=normalizeCriterion(criterion,tolerancePct);
     const c=normalizeConfig(input),t=topologyById(c.topology);let target=targetCurrent;
     if(!t.supportedOperations.includes('size'))throw new ModelError('unsupported','이 토폴로지는 RLED 자동 역산을 지원하지 않습니다.');
     let opticalGoal=null;
@@ -100,13 +159,10 @@ export function selectResistance(input,targetCurrent,{series='E24+E96',strategy=
     const root=bisect(l=>currentAtLog(l)-target,lo,hi,{fTolerance:Math.max(target*1e-7,1e-12),xTolerance:1e-10});
     if(!root.converged)throw new ModelError('nonconvergence','저항 역산이 수렴하지 않았습니다.');
     const exact=10**root.value,selected=standardResistor(exact,series,strategy),result=analyzePoint({...c,resistance:selected});
-    const achieved=opticalGoal&&result.ok?opticalValueForBasis(result.point.optical,resolvedBasis):null;
-    const goal=opticalGoal?{kind:'optical',basis:resolvedBasis,targetMcd,desiredCurrent:target,
-        achievedMcd:achieved,met:Number.isFinite(achieved)&&achieved>=targetMcd*(1-1e-7),
-        validity:opticalGoal.validity,assumptions:opticalGoal.assumptions}
-      :{kind:'current',targetCurrent:target,achievedCurrent:result.ok?result.point.current:null,
-        met:result.ok&&result.point.current>=target*(1-1e-7)};
+    const intent=opticalGoal?{kind:'optical',basis:resolvedBasis,targetMcd,desiredCurrent:target,
+        validity:opticalGoal.validity,assumptions:opticalGoal.assumptions,...goalRule}
+      :{kind:'current',targetCurrent:target,...goalRule};
+    const goal=evaluateGoal(result.ok?result.point:null,intent);
     return{exact,selected,targetCurrent:target,result,goal,
         note:'선택된 표준 저항으로 실제 전류·광도 목표 달성 여부를 다시 계산했습니다. 표본/제조 편차의 보증은 아닙니다.'};
 }
-import * as opticalFunctions from './devices.js';
