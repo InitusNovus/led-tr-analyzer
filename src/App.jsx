@@ -15,6 +15,7 @@ import QuickSpecs from './components/QuickSpecs.jsx';
 import { opticalCapability } from './core/optics.js';
 import { flagText } from './core/flags.js';
 import { sortedPresets } from './core/warnings.js';
+import { toleranceReadout, seriesAdvice, exploreScale } from './ui/tolerance.js';
 import'./index.css';
 
 const show=(v,scale=1,unit='')=>v==null||!Number.isFinite(v)?'—':(v*scale).toLocaleString('en-US',{maximumSignificantDigits:4})+(unit?' '+unit:'');
@@ -119,6 +120,7 @@ export default function App(){
  const number=(name,label,unit='',step='any')=><NumberField key={name} name={name} label={label} unit={unit} step={step} value={config[name]} onChange={v=>set(name,v)}/>;
  const ratingSummary=`RLED 정격 ${show(config.resistorRating,1000,'mW')} × ${config.derating} = ${show(config.resistorRating*config.derating,1000,'mW')} · 주변 ${config.ambient}°C · 여유 경고 ${marginPct}%`;
  const ledgerSummary=result.ok?`${p.ledger.length}개 소자 · ${result.validation.label}`:'';
+ const advice=mode==='size'?seriesAdvice(series,config.resistorTolerance):null,scaleCurrent=exploreScale('current',led),scaleMcd=exploreScale('mcd',led);
  const q1=getDeviceModel(config.deviceModels?.Q1),sizeSupported=t.supportedOperations.includes('size');
  return<>
  <header className="topbar"><div className="top-inner"><a href="/" className="brand">InitusNovus</a><nav className="nav-links"><a href="/" className="back"><ArrowLeft size={16}/> Home</a><a href="https://github.com/InitusNovus/led-tr-analyzer" target="_blank" rel="noreferrer">Source <ExternalLink size={14}/></a></nav></div></header>
@@ -177,6 +179,7 @@ export default function App(){
          <input id="target-slider" type="range" min="0.5" max="25" step="0.5"
            value={typeof targetMa==='number'?Math.max(.5,Math.min(25,targetMa)):10}
            onChange={e=>{setTargetMa(Number(e.target.value));setCornerSnapshot(null);}}/>
+       <small className="explore-scale" data-testid="explore-scale">{scaleCurrent.note} · LED {scaleCurrent.rated!=null?'정격 최대 '+show(scaleCurrent.rated,1000,'mA'):'정격 최대 미확인'}</small>
        </div>}
        {targetKind==='mcd'&&<div className="target-explore">
          <label htmlFor="optical-slider">광도 탐색용 눈금 · 유효범위는 실제 곡선으로 검사</label>
@@ -184,6 +187,8 @@ export default function App(){
            max={Math.max(20,Math.min(2000,Math.round(1.5*(led.optical?.maxMcd??led.optical?.nominalMcd??200))))}
            value={typeof targetMcd==='number'?Math.max(1,Math.min(Math.max(20,Math.min(2000,Math.round(1.5*(led.optical?.maxMcd??led.optical?.nominalMcd??200)))),targetMcd)):60}
            onChange={e=>{setTargetMcd(Number(e.target.value));setCornerSnapshot(null);}}/>
+       <small className="explore-scale" data-testid="explore-scale">눈금 {scaleMcd.range} — {scaleMcd.note}
+        {scaleMcd.datasheet?.min!=null?' · 제조사 원문 '+show(scaleMcd.datasheet.min,1,'')+'–'+show(scaleMcd.datasheet.max,1,'mcd')+' bin'+(scaleMcd.testCurrent!=null?' @ '+show(scaleMcd.testCurrent,1000,'mA'):''):scaleMcd.datasheet?.typ!=null?' · 제조사 원문 '+show(scaleMcd.datasheet.typ,1,'mcd')+' typ'+(scaleMcd.testCurrent!=null?' @ '+show(scaleMcd.testCurrent,1000,'mA'):''):' · 제조사 광도 anchor 없음'}</small>
        </div>}
        {targetKind==='mcd'&&<><label className="field" htmlFor="optical-basis"><span>광도 역산 기준</span>
          <select id="optical-basis" value={opticalBasis} onChange={e=>{setOpticalBasis(e.target.value);setCornerSnapshot(null);}}>
@@ -200,6 +205,8 @@ export default function App(){
          </select></label>
          {criterion==='approximate'&&<NumberField name="tolerancePct" label="허용 오차" unit="±%" value={tolerancePct} onChange={setTolerancePct}/>}</div>
        <div className="fields two"><label className="field" htmlFor="series"><span>E-series</span><select id="series" value={series} onChange={e=>setSeries(e.target.value)}>{['E24','E96','E24+E96'].map(s=><option key={s}>{s}</option>)}</select></label><label className="field" htmlFor="strategy"><span>표준값 선택</span><select id="strategy" value={strategy} onChange={e=>setStrategy(e.target.value)}><option value="closest">가장 가까운 저항</option><option value="safe">큰 저항</option><option value="bright">작은 저항</option></select></label></div>
+       {advice&&<div className="series-advice" data-testid="series-advice"><small>{advice.series} · {advice.spacing}. {advice.note} 선택한 계열은 공차를 바꾸지 않습니다 (현재 RLED 공차 ±{config.resistorTolerance}%).</small>
+        {advice.suggestion&&<button type="button" className="chip" data-action="apply-series-tolerance" onClick={()=>set('resistorTolerance',advice.suggestion.pct)}>공차를 {advice.suggestion.letter} ±{advice.suggestion.pct}%로 설정</button>}</div>}
        {result.sizing&&<div className="selection" data-testid="selected-resistance">
   <span>{show(result.sizing.selected,1,'Ω')}</span><small>연속값 {show(result.sizing.exact,1,'Ω')}</small>
   {result.sizing.goal&&<b className={result.sizing.goal.met?'goal-met':'goal-missed'}>{goalVerdict(result.sizing.goal)}</b>}
@@ -225,9 +232,10 @@ export default function App(){
     <div className="fields two">{number('vccTolerance','VLED 변동','±%')}{topologyUsesGPIO(t)&&number('vddTolerance','GPIO 전원 변동','±%')}{number('resistorTolerance','RLED 공차','±%')}{number('vfSpread','LED Vf 이동 가정','±V')}</div>
      <div className="tolerance-presets" role="group" aria-label="공차 빠른 선택">
        {[[5,'J ±5%'],[2,'G ±2%'],[1,'F ±1%'],[.1,'B ±0.1%']].map(([v,label])=>
-        <button key={v} onClick={()=>set('resistorTolerance',v)}>{label}</button>)}
+        <button key={v} type="button" className={cls(config.resistorTolerance===v&&'active')} aria-pressed={config.resistorTolerance===v} onClick={()=>set('resistorTolerance',v)}>{label}</button>)}
       </div>
-      <p className="subtle">E-series는 표준값 계열이며 실제 부품 공차와 독립입니다.</p>
+      <p className="subtle tolerance-readout" data-testid="tolerance-readout" role="status">{toleranceReadout(config.resistorTolerance).text}</p>
+      <p className="subtle">E-series는 표준값 계열이며 실제 부품 공차와 독립입니다. 계열을 바꿔도 위 공차는 그대로입니다.</p>
      {q1?.family==='digital-npn'&&<label className="check"><input id="include-dtc" type="checkbox" checked={includeDtc} onChange={e=>{setIncludeDtc(e.target.checked);setCornerSnapshot(null);}}/> Q1 R1 및 R2/R1 공차 포함</label>}
      <button className="primary" disabled={!p||manualRunning} onClick={runManual}>{manualRunning?'분석 중…':'현재 조건 분석'}</button>
      <p className="subtle">{autoCorners?'기본 표본(공차 축 곱)은 입력이 멈추면 자동으로 계산합니다. 버튼은 다시 실행할 때 씁니다.':'DTC 내부 공차를 포함한 확장 분석은 느리므로 직접 실행합니다.'}</p>

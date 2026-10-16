@@ -1,8 +1,9 @@
-import React,{useEffect,useRef} from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import { gpioState } from '../core/devices.js';
 import { circuitTemplate } from '../ui/circuitTemplates.js';
 import { buildScene, junctions } from '../ui/schematic.js';
 
+const OVERLAY_LEVELS = [['off', '값 표기 끔'], ['core', '핵심 값'], ['all', '전체 값']];
 const cls = (...values) => values.filter(Boolean).join(' ');
 
 function Hit({ id, selected, onSelect, label, children }) {
@@ -124,6 +125,7 @@ function Part({ p, loadOn, driveOn, point, selected, onSelect, names }) {
 
 export default function CircuitDiagram({ config, point, selectedInstance, onSelectInstance }) {
     const scrollRef=useRef(null);
+    const [level, setLevel] = useState('off');
     useEffect(()=>{
         const el=scrollRef.current;
         if(!el)return;
@@ -135,7 +137,7 @@ export default function CircuitDiagram({ config, point, selectedInstance, onSele
         }else el.scrollLeft=0;
     },[config.topology]);
     const template = circuitTemplate(config.topology);
-    const scene = buildScene(config, point);
+    const scene = buildScene(config, point, { level });
     const loadOn = (point?.current ?? 0) > 1e-9, driveOn = Math.abs(point?.gpioCurrent ?? 0) > 1e-9;
     const stateText = config.deviceModels?.GPIO1
         ? `요청 ${config.state} · 유효 ${point?.effectiveGpioState ?? gpioState(config)}`
@@ -152,18 +154,23 @@ export default function CircuitDiagram({ config, point, selectedInstance, onSele
                     {point ? `${(point.current * 1000).toPrecision(4)} mA` : '—'}
                 </span>
             </div>
+            <div className="schematic-tools" role="group" aria-label="회로에 값 표기">
+                {OVERLAY_LEVELS.map(([id, text]) => <button key={id} type="button" className={cls('overlay-btn', level === id && 'active')}
+                    aria-pressed={level === id} data-overlay={id} onClick={() => setLevel(id)}>{text}</button>)}
+            </div>
             <div className="schematic-scroll" ref={scrollRef}>
                 <svg viewBox={`0 0 ${scene.view.w} ${scene.view.h}`} role="img" aria-label={`${config.topology} 회로도`}>
                     <g className={cls(scene.parts.some(p => p.id === 'Q2') && 'compound-body')}>
                         {scene.wires.map((w, i) => <polyline key={i} className={cls('wire', (w.net === 'drive' ? driveOn : loadOn) && 'energized')}
                             points={w.points.map(q => q.join(',')).join(' ')} fill="none" strokeLinejoin="round" />)}
                         {junctions(scene).map(([x, y]) => <circle key={x + ',' + y} className="junction" cx={x} cy={y} r="3.6" />)}
-                        {scene.parts.map(p => <Part key={p.id} p={p} loadOn={loadOn} driveOn={driveOn} point={point} selected={selectedInstance}
+                        {scene.parts.map((p, i) => <Part key={p.id + ":" + i} p={p} loadOn={loadOn} driveOn={driveOn} point={point} selected={selectedInstance}
                             onSelect={onSelectInstance} names={names} />)}
                     </g>
                 </svg>
             </div>
-            <figcaption>{template?.connections.length ?? 0}개 연결 정의 · 전류 activity cue (체감 밝기 아님) · 클릭/Enter로 소자 확인</figcaption>
+            <figcaption>{template?.connections.length ?? 0}개 연결 정의 · 전류 activity cue (체감 밝기 아님) · 클릭/Enter로 소자 확인
+                {level !== 'off' && <span className="overlay-note" data-testid="overlay-note"><br />표기값은 현재 구성의 nominal 동작점입니다 (공차·sampled 극값 아님){scene.parts.some(p => p.labels.some(l => l.text.startsWith('≈'))) ? ' · ≈는 모델 근사 값' : ''}</span>}</figcaption>
         </figure>
     );
 }
