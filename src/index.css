@@ -216,3 +216,8 @@ html{scroll-padding-top:128px}
  .title-row{margin-bottom:10px;gap:10px}
  .title-row .actions button{padding:7px 9px}
 }
+
+/* #41 - LED intensity bin */
+.led-bin{margin:6px 0 4px}
+.led-bin .field{margin-bottom:4px}
+.led-bin-help{display:block;line-height:1.6}

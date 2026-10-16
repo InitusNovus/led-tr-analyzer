@@ -119,7 +119,9 @@ test('margin warnings never use a temperature ratio and never appear for exceede
 });
 
 test('unknown limits and model approximations are separate severities with their own text', () => {
-    const { a, w } = run({ ...freshConfig(), led: 'KT-0805Y' }, { corners: false });
+    // An ideal control source has no rating to check against (unknown); the KENTO Y sheet now carries its own limits.
+    const base = freshConfig();
+    const { a, w } = run({ ...base, deviceModels: { ...base.deviceModels, GPIO1: 'assumed:DC-Thevenin' } }, { corners: false });
     const unknown = w.findings.filter(f => f.severity === 'unknown'), approx = w.findings.filter(f => f.severity === 'approximation');
     assert.equal(unknown.length, a.validation.checks.filter(c => c.status === 'unknown').length);
     assert.ok(unknown.length > 0);

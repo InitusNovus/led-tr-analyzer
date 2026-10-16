@@ -21,6 +21,8 @@ MUTATIONS=[
  ('strip-not-sticky','src/index.css',".result-strip{min-height:60px;position:sticky;",".result-strip{min-height:60px;position:relative;",{'G01'}),
  ('quick-specs-collapsed','src/components/QuickSpecs.jsx',"const KEY_SPECS = 3;","const KEY_SPECS = 0;",{'G02'}),
  ('mcd-guide-removed','src/components/DesignSummary.jsx','{optical.usageGuide&&<p className="mcd-guide"','{false&&<p className="mcd-guide"',{'G03'}),
+ ('led-bin-ignored','src/core/optics.js',"const part=ledModel(id,binId);","const part=ledModel(id);",{'G15','unit'}),
+ ('led-bin-leaks-across-leds','src/ui/designState.js',"led: action.id, ledBin: null }","led: action.id }",{'G15','unit'}),
  ('phone-schematic-shrunk','src/index.css',".schematic svg{min-width:640px}",".schematic svg{min-width:420px}",{'G13','G14'}),
 ]
 def run(cmd,**kw): return subprocess.run(cmd,cwd=ROOT,capture_output=True,text=True,**kw)
