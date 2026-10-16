@@ -61,6 +61,7 @@ src/core/devices.js        소자별 축약 비선형 함수
 src/core/topologies.js     회로별 결합 동작점, 전력 수지
 src/core/analysis.js       한계 검사, 코너별 witness, 저항 선정
 src/ui/circuitTemplates.js 회로별 instance/terminal 연결 계약
+src/ui/schematic.js        단자 좌표 기반 회로도 장면 (배선은 심볼의 단자에서만 만들어짐)
 src/ui/viewModel.js        소자·결과·근거 표시 adapter
 src/components/            실제 심볼 회로도와 오류 경계
 src/App.jsx                한국어 workbench, 실제 부품 선택, JSON 내보내기

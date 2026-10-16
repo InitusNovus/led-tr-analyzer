@@ -47,6 +47,13 @@ try:
     if match_domain: page.locator('#vcc').fill('3.3')
     page.locator('#state').select_option('HIGH' if t['active']=='LOW' else 'LOW');expect(page.locator('.quick-results')).to_contain_text('0 mA');tick()
     if match_domain: page.locator('#vcc').fill('5')
+  # Digital transistor: plain NPN symbol with R1 / R2 as their own clickable parts, no package-sized box.
+  page.locator('#topology').select_option('digital-npn')
+  check(page.locator('.schematic .digital-package').count()==0 and page.locator('.schematic rect:not(.hit-area)').evaluate_all('(rs)=>rs.every(r=>Math.max(r.getBBox().width,r.getBBox().height)<=95)'),'digital transistor is not drawn as a box')
+  for part_id in ['Q1.R1','Q1.R2']:
+   page.locator('.schematic [data-instance-id="'+part_id+'"]').click()
+   expect(page.locator('.inspector')).to_have_attribute('data-inspector-id',part_id)
+   check('상위 Q1' in page.locator('.inspector').inner_text(),part_id+' inspector names its parent Q1')
   scenario('BASE')
   page.locator('#topology').select_option('gpio-source');page.locator('#state').select_option('LOW');expect(page.locator('.schematic-head')).to_contain_text('요청 LOW');check('GPIO HIGH' not in page.locator('.schematic').inner_text(),'source state not hard-coded HIGH')
   page.locator('#topology').select_option('gpio-sink');page.locator('#state').select_option('HIGH');expect(page.locator('.schematic-head')).to_contain_text('요청 HIGH');check('GPIO LOW' not in page.locator('.schematic').inner_text(),'sink state not hard-coded LOW')
