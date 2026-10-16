@@ -26,6 +26,10 @@ try:
   if not INLINE: raise RuntimeError('Preview server did not start')
  catalog=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import {TOPOLOGIES} from './src/core/topologies.js';console.log(JSON.stringify(TOPOLOGIES))"],cwd=ROOT,text=True))
  contracts=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import {CIRCUIT_TEMPLATES} from './src/ui/circuitTemplates.js';console.log(JSON.stringify(CIRCUIT_TEMPLATES))"],cwd=ROOT,text=True))
+ views=json.loads(subprocess.check_output(['node','--input-type=module','-e',"""
+import {analyzePoint} from './src/core/analysis.js';import {freshConfig,transitionConfig,TOPOLOGIES} from './src/core/topologies.js';import {buildInstanceViews} from './src/ui/viewModel.js';
+const out={};for(const t of TOPOLOGIES){const r=analyzePoint(transitionConfig(freshConfig(),t.id));out[t.id]=Object.fromEntries(buildInstanceViews(r.point.config,r.point,r.validation).map(v=>[v.instanceId,{metrics:v.metrics.map(m=>m.display),checks:v.checks.length,part:v.part?.name??null}]));}
+console.log(JSON.stringify(out))"""],cwd=ROOT,text=True))
  with sync_playwright() as p:
   exe=os.environ.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE') or shutil.which('chromium');browser=p.chromium.launch(headless=True,**({'executable_path':exe} if exe else {}));page=browser.new_page(viewport={'width':1365,'height':1000},device_scale_factor=1)
   # Folded sections (details.fold) are collapsed by default. Most scenarios exercise their contents, so they are opened as soon as they
@@ -44,6 +48,14 @@ try:
    declared=set(contracts[t['id']]['instances'])
    check(rendered.issubset(declared),t['id']+' rendered refs outside template: '+str(rendered-declared))
    page.locator('.schematic').screenshot(path=str(ATLAS/(t['id']+'.png')))
+   # every drawn instance, clicked: the inspector names the same reference and shows that instance's own numbers and checks
+   for inst in sorted(declared):
+    page.locator('.schematic [data-instance-id="'+inst+'"]').click()
+    expect(page.locator('.inspector')).to_have_attribute('data-inspector-id',inst)
+    want=views[t['id']][inst]
+    got=page.locator('.inspector .inspector-metrics b').all_inner_texts()
+    check(got==want['metrics'],t['id']+'/'+inst+' inspector numbers equal the view: '+str(got)+' vs '+str(want['metrics']))
+    check(page.locator('.inspector .instance-checks>div').count()==want['checks'],t['id']+'/'+inst+' inspector lists its '+str(want['checks'])+' checks')
    if t['active']!='always':
     # Direct high-side / GPIO sink OFF can only be asserted by this reduced model when VLED and GPIO domains match.
     match_domain=t['id'] in ['gpio-sink','pnp-high','pmos-high']
@@ -308,6 +320,27 @@ try:
    page.locator('.schematic [data-instance-id="'+instance+'"]').click()
    expect(page.locator('.inspector')).to_have_attribute('data-inspector-id',instance)
    tick()
+  # The operating point fails (RB emptied): static information stays, no numbers are invented, and the field recovers in place.
+  page.locator('#topology').select_option('npn-low')
+  page.locator('#baseResistance').fill('')
+  expect(page.locator('[data-testid="result-strip"]')).to_have_attribute('data-state','error')
+  expect(page.locator('#baseResistance')).to_be_visible();check(page.locator('#baseResistance').get_attribute('aria-invalid')=='true','the emptied field is marked invalid')
+  page.locator('.schematic [data-instance-id="Q1"]').click()
+  expect(page.locator('.inspector')).to_have_attribute('data-inspector-id','Q1')
+  check(page.locator('.inspector [data-testid="quick-specs"]').count()==1,'Q1 keeps its static spec while the operating point is invalid')
+  check(page.locator('.inspector .inspector-metrics').count()==0 and '계산되지 않았' in page.locator('.inspector').inner_text(),'no operating numbers are shown for Q1 while invalid')
+  check(page.locator('#model-Q1').is_visible() and page.locator('.schematic').is_visible(),'part picker and circuit stay usable while invalid')
+  check(page.get_by_role('button',name='결과 JSON',exact=False).is_disabled(),'the result export is disabled instead of exporting nothing')
+  page.locator('#baseResistance').fill('4700')
+  expect(page.locator('[data-testid="result-strip"]')).to_have_attribute('data-state','ok')
+  check(page.locator('.inspector .inspector-metrics').count()==1,'Q1 shows its operating numbers again after the field is fixed')
+  # A condition the selected model does not support is refused with its reason, and the static data stays.
+  page.locator('#topology').select_option('gpio-source');page.locator('#vdd').fill('5')
+  expect(page.locator('.quick-error, .notice.error').first).to_be_visible()
+  check('2.7' in page.locator('.quick-error, .notice.error').first.inner_text(),'the refusal names the supported GPIO range')
+  check(page.locator('#device-slots [data-testid="quick-specs"]').count()>=1,'GPIO static spec stays while the model refuses the condition')
+  page.locator('#vdd').fill('3.3')
+  expect(page.locator('[data-testid="result-strip"]')).to_have_attribute('data-state','ok')
   scenario('BASE')
   page.locator('#topology').select_option('npn-low')
   page.locator('#model-GPIO1').select_option('assumed:DC-Thevenin')
@@ -455,8 +488,18 @@ try:
   # SVG screen-space font size: viewBox units scaled by CTM. Small labels target >=12 CSS px.
   min_px=page.locator('.schematic svg').evaluate("""svg=>{const m=svg.getScreenCTM();const s=Math.abs(m.a);return Math.min(...[...svg.querySelectorAll('text')].map(t=>(parseFloat(getComputedStyle(t).fontSize)||12)*s))}""")
   check(min_px>=11.5,'schematic text remains readable: '+str(min_px))
+  # mode switch on the phone: the goal fields appear in the controls under the circuit, nothing overflows, and the circuit stays where it was
+  doc_top=lambda:page.locator('.schematic').evaluate('e=>e.getBoundingClientRect().top+window.scrollY');circuit_top=doc_top()
+  page.get_by_role('button',name='목표에서 저항 선정',exact=True).click();expect(page.locator('#targetMa')).to_be_visible()
+  check(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'no page overflow after switching to sizing mode on the phone')
+  check(page.locator('#target-slider').is_visible() and page.locator('[data-testid="selected-resistance"]').is_visible(),'sizing controls and the selected resistance are reachable on the phone')
+  check(abs(doc_top()-circuit_top)<2,'switching mode does not move the circuit: '+str((circuit_top,doc_top()))+' strip '+str(page.locator('[data-testid="result-strip"]').bounding_box()))
+  page.get_by_role('button',name='저항으로 검증',exact=True).click();expect(page.locator('#resistance')).to_be_visible()
   check(not errors,'browser errors: '+str(errors));browser.close()
  print(json.dumps({'mode':'inline-artifact' if INLINE else 'http-pages-subpath','checks':checks,'scenarios':scenario_checks,'topologies':len(catalog),'browser_errors':errors},ensure_ascii=False))
+except Exception as e:
+ print('SMOKE_FAILED scenario=%s: %s'%(current,(str(e).strip().splitlines() or [''])[0][:240]))
+ raise
 finally:
  if server:
   os.killpg(server.pid,signal.SIGTERM)

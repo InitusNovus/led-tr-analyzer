@@ -81,7 +81,10 @@ export function buildInstanceViews(config,point,validation) {
     if(point.optical?.kind==='range')metric('LED1','광도 min',point.optical.minMcd,1,'mcd'),
         metric('LED1','광도 max',point.optical.maxMcd,1,'mcd');
     if(point.optical?.nominalMcd!=null)metric('LED1','광도 typ',point.optical.nominalMcd,1,'mcd');
-    metric('RLED','저항',config.resistance,1,'Ω');metric('RLED','전력',point.resistorPower,1000,'mW');
+    const rled=point.ledger.find(e=>(e.instanceId??e.id)==='RLED');
+    metric('RLED','저항',config.resistance,1,'Ω');
+    if(rled){metric('RLED','전류',rled.current,1000,'mA');metric('RLED','전압강하',rled.voltage,1,'V');}
+    metric('RLED','전력',point.resistorPower,1000,'mW');
     if(config.deviceModels?.GPIO1){
       metric('GPIO1','핀 전류 (+source)',point.gpioCurrent,1000,'mA');
       metric('GPIO1','단자 전압',point.gpioVoltage,1,'V');
@@ -91,7 +94,9 @@ export function buildInstanceViews(config,point,validation) {
       v.modelId=q.modelId;v.part=getDeviceModel(q.modelId);
       metric(id,'전류',q.current,1000,'mA');
       metric(id,'전압강하',q.voltage,1,'V');
-      metric(id,'손실',q.power,1000,'mW');
+      const die=point.ledger.find(e=>e.id===id+'.die');   // digital transistor: the package loss is the die plus its built-in R1/R2
+      if(die){metric(id,'패키지 손실',q.power,1000,'mW');metric(id,'다이 손실',die.power,1000,'mW');}
+      else metric(id,'손실',q.power,1000,'mW');
       if(q.base!=null)metric(id,'IB',q.base,1000,'mA');
       if(q.emitter!=null)metric(id,'IE',q.emitter,1000,'mA');
       if(q.gate!=null)metric(id,'|VGS|',Math.abs(q.gate),1,'V');
