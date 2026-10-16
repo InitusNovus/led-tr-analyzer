@@ -28,6 +28,9 @@ try:
  contracts=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import {CIRCUIT_TEMPLATES} from './src/ui/circuitTemplates.js';console.log(JSON.stringify(CIRCUIT_TEMPLATES))"],cwd=ROOT,text=True))
  with sync_playwright() as p:
   exe=os.environ.get('PLAYWRIGHT_CHROMIUM_EXECUTABLE') or shutil.which('chromium');browser=p.chromium.launch(headless=True,**({'executable_path':exe} if exe else {}));page=browser.new_page(viewport={'width':1365,'height':1000},device_scale_factor=1)
+  # Folded sections (details.fold) are collapsed by default. Most scenarios exercise their contents, so they are opened as soon as they
+  # appear; G01 turns this off (window.__autoUnfold=false) to verify the default and the focus-opens-the-fold behaviour.
+  page.add_init_script("""window.__autoUnfold=true;new MutationObserver(()=>{if(window.__autoUnfold)document.querySelectorAll('details.fold:not([open])').forEach(d=>{d.open=true;});}).observe(document,{childList:true,subtree:true});""")
   page.on('pageerror',lambda e:errors.append(str(e)));page.on('console',lambda m:errors.append(m.text) if m.type=='error' else None)
   def load():
    if INLINE:
@@ -334,12 +337,64 @@ try:
   expect(page.locator('.warning-scope-note[data-phase="partial"]')).to_contain_text('27개 조건')
   check('전체 범위의 보증이 아닙니다' in page.locator('.warning-scope-note[data-phase="partial"]').inner_text(),'warnings state that a partial run is not a full guarantee')
   page.get_by_role('button',name='전체 초기화',exact=True).click()
+  scenario('G01')
+  # Screen integration: sticky result strip, circuit then controls, folded details with summaries, focus opens folds.
+  page.set_viewport_size({'width':1365,'height':1000});load();expect(page.locator('.schematic')).to_be_visible()
+  page.evaluate("window.__autoUnfold=false;document.querySelectorAll('details.fold').forEach(d=>{d.open=false;})")
+  strip=page.locator('[data-testid="result-strip"]');expect(strip).to_be_visible()
+  st=strip.inner_text();check('LED 전류' in st and '광도' in st and 'Nominal' in st and 'Sampled' in st,'result strip shows current, optical, nominal and sampled state: '+st)
+  check(page.evaluate("getComputedStyle(document.querySelector('[data-testid=result-strip]')).position")=='sticky','result strip is sticky')
+  page.evaluate('window.scrollTo(0,1400)');page.wait_for_timeout(150)
+  top=strip.bounding_box()['y'];check(50<=top<=70,'result strip stays under the header while scrolling: '+str(top))
+  page.evaluate('window.scrollTo(0,0)')
+  sb=page.locator('.schematic').bounding_box();cb=page.locator('#control-card').bounding_box()
+  svgh=page.locator('.schematic svg').bounding_box()['height'];check(sb['y']<600 and svgh<=490,'circuit starts on the first screen and its drawing is capped near 480px: '+str(svgh))
+  check(cb['y']>=sb['y']+sb['height'] and cb['y']-(sb['y']+sb['height'])<400,'design controls sit directly under the circuit: '+str(cb))
+  check(page.locator('#resistance').is_visible(),'RLED input is reachable without scrolling past the details')
+  # folded by default, each with a one-line summary
+  folds=page.locator('details.fold');check(folds.count()>=4,'details are folds: '+str(folds.count()))
+  check(page.locator('details.fold[open]').count()==0,'folds are collapsed by default')
+  check(all(len(t.strip())>=4 for t in page.locator('details.fold>summary .fold-summary').all_inner_texts()),'every fold states its content in the summary')
+  check('RLED 정격' in page.locator('#power-settings>summary').inner_text(),'ratings fold summarises the rating in one line')
+  check(not page.locator('#resistorRating').is_visible(),'ratings stay folded until requested')
+  # a warning's “입력 수정” opens the fold holding the field
+  page.locator('#power-settings>summary').click();page.locator('#resistance').fill('220');page.locator('#resistorRating').fill('0.0625')
+  page.locator('#power-settings>summary').click()
+  warn=page.locator('[data-testid="warnings"] .warning[data-severity="exceeded"] button[data-action="focus"]').first
+  expect(warn).to_be_visible(timeout=10000);warn.click();page.wait_for_timeout(300)
+  check(page.locator('#power-settings').evaluate('d=>d.open'),'focusing an input opens its fold')
+  check(page.evaluate('document.activeElement.id')=='resistorRating','the folded field receives focus')
+  page.evaluate('window.__autoUnfold=true');page.get_by_role('button',name='전체 초기화',exact=True).click()
+  scenario('G02')
+  # Key LED / transistor test conditions stay visible; the rest folds.
+  page.locator('#topology').select_option('npn-low');load() if False else None
+  led_specs=page.locator('.setup-panel [data-testid="quick-specs"]').first
+  expect(led_specs).to_be_visible();rows=led_specs.locator('.key-specs .spec-row')
+  check(1<=rows.count()<=3,'LED key specs are inline: '+str(rows.count()))
+  check(any('mA' in t for t in rows.all_inner_texts()),'key specs carry the test current')
+  check(not led_specs.locator('details').evaluate('d=>d.open'),'the long table is folded under 더보기')
+  before=led_specs.inner_text();page.locator('#led').select_option('KT-0805G');after=page.locator('.setup-panel [data-testid="quick-specs"]').first.inner_text()
+  check(before!=after,'quick specs follow the selected LED')
+  q1_specs=page.locator('#device-slots [data-testid="quick-specs"]').first;expect(q1_specs).to_be_visible()
+  check(q1_specs.locator('.key-specs .spec-row').count()>=1,'transistor key specs are inline')
+  scenario('G03')
+  # The mcd guide is one visible line next to the result; absent when the LED has no basis.
+  page.get_by_role('button',name='전체 초기화',exact=True).click()
+  guide=page.locator('[data-testid="mcd-guide"]');expect(guide).to_be_visible()
+  check('참고' in guide.inner_text() or '표시등' in guide.inner_text(),'mcd guide is readable without opening anything: '+guide.inner_text())
+  check(guide.locator('xpath=ancestor::details').count()==0,'mcd guide is not inside a collapsible box')
+  page.locator('#led').select_option('KT-0805Y')
+  expect(page.locator('[data-testid="mcd-guide"]')).to_have_count(0)
+  check('미모델링' in page.locator('[data-strip="optical"]').inner_text(),'strip states that optical output is unavailable instead of inventing a value')
+  page.get_by_role('button',name='전체 초기화',exact=True).click()
   scenario('G14')
   page.set_viewport_size({'width':390,'height':844});load();expect(page.locator('.schematic')).to_be_visible();check(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),'no page horizontal overflow');check(page.locator('.schematic-scroll').evaluate('(e)=>e.scrollWidth>=e.clientWidth'),'schematic can use local 2D scroll')
   expect(page.locator('#topology-mobile')).to_be_visible();page.locator('#topology-mobile').select_option('gpio-source');expect(page.locator('.schematic')).to_have_attribute('data-topology','gpio-source');tick()
   led_center=page.locator('.schematic [data-instance-id="LED1"]').evaluate('(el)=>{const r=el.getBoundingClientRect();return r.left+r.width/2}')
   check(led_center>60 and led_center<360,'mobile initially centers essential LED symbol: '+str(led_center))
-  expect(page.locator('.schematic-panel .design-summary')).to_be_visible();tick()
+  ys=[page.locator(s).first.bounding_box()['y'] for s in ['.schematic-panel','#control-card','.design-summary','.setup-panel','.fold-group']]
+  check(ys==sorted(ys),'mobile order: circuit, controls, judgement, settings, details: '+str(ys))
+  sb2=page.locator('[data-testid="result-strip"]').bounding_box();check(sb2['height']<=64,'mobile result strip stays one compact row: '+str(sb2))
   mobile_box=page.locator('.schematic').bounding_box();check(mobile_box is not None and mobile_box['y']<844,'schematic access begins within first mobile viewport: '+str(mobile_box))
   page.screenshot(path=str(OUT/'mobile.png'),full_page=True)
   # SVG screen-space font size: viewBox units scaled by CTM. Small labels target >=12 CSS px.

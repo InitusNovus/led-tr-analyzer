@@ -13,8 +13,7 @@ function OpticalResult({optical}){
  return <div className="design-optical"><div><strong>광도 추정</strong><b>{value}</b></div>
   <small>{range?'원문 광도 bin × 상대 광도 곡선. 다른 전류에서 min/max 보증값이 아닙니다.':
     optical.kind==='test-point'?'원문 단일 시험점 전용':'typ 곡선 기반 또는 미지원 조건'}</small>
-  {optical.usageGuide&&<details><summary>mcd 실무 사용감 가이드</summary>
-   <p>{optical.usageGuide.label}</p><p>{optical.usageGuide.note}</p></details>}
+  {optical.usageGuide&&<p className="mcd-guide" data-testid="mcd-guide"><span aria-hidden="true">ⓘ</span> <strong className="mcd-guide-label">{optical.usageGuide.label}</strong> — {optical.usageGuide.note}</p>}
   {optical.kind==='unavailable'&&<small>사유: {optical.reason}</small>}
  </div>;
 }
@@ -44,7 +43,8 @@ export default function DesignSummary({config,point,validation,corners,cornerPha
   <SensitivityRibbon point={point} corners={corners} phase={cornerPhase??'idle'} progress={cornerProgress}/>
   {goal&&<GoalSummary goal={goal}/>}
   <OpticalResult optical={point?.optical}/>
-  <QPointSummary point={point} onInspect={onInspect}/>
+  {point&&<details className="fold" data-fold="qpoint"><summary><b>전압 분담 · β/IB · 소자별 구동</b><span className="fold-summary">펼쳐서 KVL 경로와 소자 동작 보기</span></summary>
+   <QPointSummary point={point} onInspect={onInspect}/></details>}
   <PowerBudget config={config} point={point} corners={corners} cornerPhase={cornerPhase} onApplyPreset={rated=>onSetConfig('resistorRating',rated)}/>
   <WarningSummary config={config} point={point} validation={validation} corners={corners} cornerPhase={cornerPhase} marginPct={marginPct} view={view} onInspect={onInspect} onFocusInput={onFocusInput}/>
  </section>;
