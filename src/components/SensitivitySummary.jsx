@@ -1,3 +1,4 @@
+import Help from './Help.jsx';
 import React from 'react';
 import { LEDS, getDeviceModel } from '../data/catalog.js';
 import { CORNER_PHASE_TEXT } from '../ui/viewModel.js';
@@ -40,7 +41,7 @@ export function SensitivityRibbon({ point, corners, phase, progress }) {
                 <span><small>Nominal</small><b data-ribbon="nominal">{amount(nominal, 1000, 'mA')}</b></span>
                 <span><small>Sampled Max</small><b data-ribbon="max">{amount(cur.max.value, 1000, 'mA')}</b></span>
             </div>
-            <small>{corners.validCount}/{corners.count}개 지정 시나리오의 sampled extrema이며 보증 worst case가 아닙니다. 스윕: {sweptText(corners)}</small>
+            <small>{corners.validCount}/{corners.count}개 시나리오 · 스윕: {sweptText(corners)}<Help label="sampled 설명">지정 시나리오의 sampled extrema이며 보증 worst case가 아닙니다.</Help></small>
         </> : <p className="subtle">{phase === 'stale' ? '입력이 바뀌어 이전 sampled 결과를 버렸습니다. 다시 실행하면 현재 값으로 계산합니다.'
             : phase === 'running' ? '입력이 멈추면 표본을 자동으로 계산합니다. 계산 중에도 입력할 수 있습니다.'
             : phase === 'error' ? corners.error
@@ -52,7 +53,7 @@ export function SensitivityRibbon({ point, corners, phase, progress }) {
             {spread.binAtNominal && <span>광도 bin 범위(공칭 전류): {amount(spread.binAtNominal.min, 1, 'mcd')} … {amount(spread.binAtNominal.max, 1, 'mcd')}</span>}
             {spread.electricalOnly && <span>전기 조건 변동만({spread.electricalOnly.basis === 'typ' ? 'typ' : '중간 대표값'} 기준): {amount(spread.electricalOnly.min, 1, 'mcd')} … {amount(spread.electricalOnly.max, 1, 'mcd')}</span>}
             {spread.combined && Number.isFinite(spread.combined.min) && <span>둘을 결합한 추정: {amount(spread.combined.min, 1, 'mcd')} … {amount(spread.combined.max, 1, 'mcd')}</span>}
-            <small>bin 범위와 전기 변동은 서로 다른 불확실성입니다. 확률·제조 보증이 아닙니다.</small>
+            <Help label="불확실성 설명">bin 범위와 전기 변동은 서로 다른 불확실성입니다. 확률·제조 보증이 아닙니다.</Help>
         </div>}
     </div>;
 }
@@ -83,6 +84,6 @@ export function SensitivityWitness({ corners, point, config }) {
         })}
         <p className="subtle">스윕하지 않은 조건(공칭값 유지): {corners.axes.fixed.map(f => f.label + (f.value != null ? ' ' + amount(f.value, 1, f.unit) : '')).join(' · ')}</p>
         <p className="subtle">적용된 소자: {appliedDevices(config).map(([slot, name]) => slot + ' ' + name).join(' · ')}</p>
-        <p className="subtle">{corners.note}</p>
+        <p className="subtle">모델 주석<Help label="모델 주석">{corners.note}</Help></p>
     </div>;
 }

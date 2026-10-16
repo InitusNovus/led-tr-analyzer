@@ -1,3 +1,4 @@
+import Help from './Help.jsx';
 import React from 'react';
 import { qPointSummary } from '../core/qpoint.js';
 import { SOURCES, getDeviceModel } from '../data/catalog.js';
@@ -63,7 +64,7 @@ function DigitalRow({ d, onInspect }) {
                 <span><small>IC/IB (내부)</small><b data-metric="internal-ratio">{ratio(d.internalRatio)}</b></span>
                 <span><small>내장 R1 / R2</small><b>{amount(d.r1, 1, 'Ω')} / {amount(d.r2, 1, 'Ω')}</b></span>
                 <span><small>입력 단자 전압</small><b>{amount(d.inputVoltage, 1, 'V')}</b></span></div></div>
-        <small>IO/II는 외부 단자 전류비이고 IC/IB는 내부 베이스 전류비입니다. 두 값은 R2로 빠지는 전류만큼 달라 서로 대체할 수 없습니다.</small>
+        <Help label="IO/II 설명">IO/II는 외부 단자 전류비이고 IC/IB는 내부 베이스 전류비입니다. 두 값은 R2로 빠지는 전류만큼 달라 서로 대체할 수 없습니다.</Help>
         <Figures list={d.figures} />
         {src?.url && <a href={src.url} target="_blank" rel="noreferrer">데이터시트: {src.manufacturer} · {src.revision}</a>}
     </div>;
@@ -93,8 +94,8 @@ export default function QPointSummary({ point, onInspect }) {
                     : d.kind === 'digital' ? <DigitalRow key={d.instanceId} d={d} onInspect={onInspect} />
                     : <MosRow key={d.instanceId} d={d} onInspect={onInspect} />)}
             </div>}
-            {point.config.topology === 'npn-follower' && <small>에미터 팔로워: LED와 RLED에는 IE가 흐르고 VLED 공급은 IC입니다. 두 값은 IB만큼 다릅니다.</small>}
-            {point.config.topology === 'npn-current-sink' && <small>전류 싱크: RLED·LED·Q1 VCE에는 IC가, RE에는 IE가 흐릅니다. RE 전압은 IE×RE입니다.</small>}
+            {point.config.topology === 'npn-follower' && <Help label="에미터 팔로워 설명">에미터 팔로워: LED와 RLED에는 IE가 흐르고 VLED 공급은 IC입니다. 두 값은 IB만큼 다릅니다.</Help>}
+            {point.config.topology === 'npn-current-sink' && <Help label="전류 싱크 설명">전류 싱크: RLED·LED·Q1 VCE에는 IC가, RE에는 IE가 흐릅니다. RE 전압은 IE×RE입니다.</Help>}
         </>}
         <details className="qpoint-help">
             <summary>ⓘ IC/IB(강제 β)와 구동 경로 읽는 법</summary>
