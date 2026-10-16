@@ -47,7 +47,19 @@ try:
     if match_domain: page.locator('#vcc').fill('3.3')
     page.locator('#state').select_option('HIGH' if t['active']=='LOW' else 'LOW');expect(page.locator('.quick-results')).to_contain_text('0 mA');tick()
     if match_domain: page.locator('#vcc').fill('5')
+  # Digital transistor: a plain NPN symbol with R1 / R2 as their own clickable parts, inside one dashed package outline
+  # (not a filled box); no other topology draws a package.
+  page.locator('#topology').select_option('digital-npn')
+  outline=page.locator('.schematic .package-outline')
+  check(outline.count()==1 and outline.evaluate('(e)=>getComputedStyle(e).fill==="none"&&getComputedStyle(e).strokeDasharray!=="none"'),'digital transistor shows one dashed, unfilled package outline')
+  check(page.locator('.schematic rect:not(.hit-area):not(.package-outline)').evaluate_all('(rs)=>rs.every(r=>Math.max(r.getBBox().width,r.getBBox().height)<=95)'),'no other package-sized box')
+  for part_id in ['Q1.R1','Q1.R2']:
+   page.locator('.schematic [data-instance-id="'+part_id+'"]').click()
+   expect(page.locator('.inspector')).to_have_attribute('data-inspector-id',part_id)
+   check('상위 Q1' in page.locator('.inspector').inner_text(),part_id+' inspector names its parent Q1')
   scenario('BASE')
+  page.locator('#topology').select_option('npn-low')
+  check(page.locator('.schematic .package-outline').count()==0,'only the digital transistor is drawn as a package')
   page.locator('#topology').select_option('gpio-source');page.locator('#state').select_option('LOW');expect(page.locator('.schematic-head')).to_contain_text('요청 LOW');check('GPIO HIGH' not in page.locator('.schematic').inner_text(),'source state not hard-coded HIGH')
   page.locator('#topology').select_option('gpio-sink');page.locator('#state').select_option('HIGH');expect(page.locator('.schematic-head')).to_contain_text('요청 HIGH');check('GPIO LOW' not in page.locator('.schematic').inner_text(),'sink state not hard-coded LOW')
   # At the default 5V LED / 3.3V GPIO domains, OFF is deliberately not claimed without injection/5V-tolerance modeling.

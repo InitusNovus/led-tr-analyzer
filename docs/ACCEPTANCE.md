@@ -47,7 +47,7 @@
 | G06 | nominal 전류 + sampled Min/Max + 근거 시나리오 | #24 | 구현 (띠, 극값 조건 표, 고정 축, 수동 DTC 확장, 무효화) | 11 |
 | G07 | nominal 통과/sampled 초과, 부분 실패 표시 | #24 #26 | 구현 (두 범위 병기, 부분 실패 시 제외 개수와 보증 아님 문구) | 5 |
 | G08 | BJT/DTC IC/IB·IO/II 해설 | #25 | 구현 (DTC 외부/내부 비율, 팔로워 IE/IC, RE 전압, 2단 구동, OFF, 모바일) | 11 |
-| G09 | 13개 topology의 clickable instance → inspector → check | #29 | 부분 (렌더된 ref ⊆ 템플릿, RGS_IN/OUT) | 38 |
+| G09 | 13개 topology의 clickable instance → inspector → check | #29 | 부분 (렌더된 ref = 템플릿 instance, 그려진 연결 = 템플릿 연결, DTC R1/R2 선택; 소자별 check 연결은 남음) | 41 |
 | G10 | 입력 비운 뒤 복구, 계산 실패 중 정적 스펙 보존 | #29 | 부분 (4개 필드 복구만) | 6 |
 | G11 | 경고 → 정확한 field focus → 수정 → 재분석 | #26 | 구현 (검증·선정 모드별 포커스, 수정 후 재분석, 여유 경고 기준, 정격 미확인·모델 근사 분리) | 12 |
 | G12 | 전력 막대의 nominal/peak 분리, generic preset 구별 | #26 | 구현 (마커 3종, 필요 정격, preset 정렬·적용·재검증) | 9 |
