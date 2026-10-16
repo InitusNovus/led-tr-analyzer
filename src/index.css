@@ -142,3 +142,5 @@
 
 .junction{fill:#9fb7c2}
 .hit-area{fill:transparent;stroke:none;pointer-events:all}
+.package-outline{fill:none;stroke:#7f98a4;stroke-width:1.5;stroke-dasharray:6 4;pointer-events:none;vector-effect:non-scaling-stroke}
+.schem-part.selected .package-outline{stroke:#ffe28a}

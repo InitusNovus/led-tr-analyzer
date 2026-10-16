@@ -100,6 +100,7 @@ function Part({ p, loadOn, driveOn, point, selected, onSelect, names }) {
             const own = p.labels.filter(l => !['R1', 'R2', 'IN'].includes(l.text));
             return <>
                 <Hit id={p.id} label={p.id} {...common}>
+                    <rect className="package-outline" x={p.outline.x} y={p.outline.y} width={p.outline.w} height={p.outline.h} rx={p.outline.r} />
                     <HitArea boxes={p.boxes.slice(0, 1)} pad={4} />
                     <BjtShape p={{ ...p, polarity: 'npn' }} />
                     {own.map((t, i) => <text key={i} className={t.cls} x={t.x} y={t.y} textAnchor={t.anchor}>{t.text}</text>)}

@@ -61,16 +61,24 @@ function mos(id, x, y, { polarity, name }) {
     label(p, 'G', -56, -8, { cls: 'terminal-label' });
     return p;
 }
-/** Digital transistor: a plain NPN with R1 in series with the base and R2 from base to emitter. No enclosing box. */
+/**
+ * Digital transistor: a plain NPN with R1 in series with the base and R2 from base to emitter, inside a dashed package
+ * outline. The IN / C / E leads cross that outline, so the three external pins sit outside it and the inner terminals
+ * (in2, ct, ee) inside; the inner wires are drawn as scene wires like any other connection.
+ */
+const DTC_OUT = { l: -108, t: -50, w: 154, h: 114, r: 16 };
 function dtc(id, x, y, { name }) {
     const p = make('dtc', id, x, y, { subHits: [id + '.R1', id + '.R2'] });
-    pin(p, 'in', -96, 0, id + '.IN'); pin(p, 'b', -48, 0, id + '.B'); pin(p, 't', 0, -TR, id + '.C'); pin(p, 'e', 0, TR, id + '.E');
-    pin(p, 'r1b', -48, 0, id + '.R1'); pin(p, 'r2b', -48, 54, id + '.R2');
+    pin(p, 'in', -120, 0, id + '.IN'); pin(p, 't', 0, -62, id + '.C'); pin(p, 'e', 0, 72, id + '.E');             // package pins
+    pin(p, 'in2', -96, 0, id + '.IN'); pin(p, 'ct', 0, -TR, id + '.C'); pin(p, 'ee', 0, TR, id + '.E');          // inside the package
+    pin(p, 'b', -48, 0, id + '.B'); pin(p, 'r1b', -48, 0, id + '.R1'); pin(p, 'r2b', -48, 54, id + '.R2');
+    p.outline = { x: x + DTC_OUT.l, y: y + DTC_OUT.t, w: DTC_OUT.w, h: DTC_OUT.h, r: DTC_OUT.r };
     box(p, -35, -35, 70, 70); box(p, -84, -7, 26, 14); box(p, -55, 24, 14, 22);
-    label(p, `${id} · ${name}`, 50, -8); label(p, 'digital NPN · R1/R2 내장', 50, 13, { cls: 'minor-label' });
+    label(p, `${id} · ${name}`, 56, -8); label(p, 'digital NPN · R1/R2 내장', 56, 13, { cls: 'minor-label' });
+    label(p, 'DTC 패키지', -104, -57, { cls: 'terminal-label' });
     label(p, 'C', 9, -30, { cls: 'terminal-label' }); label(p, 'E', 9, 40, { cls: 'terminal-label' });
     label(p, 'R1', -71, -13, { cls: 'terminal-label', anchor: 'middle' }); label(p, 'R2', -62, 39, { cls: 'terminal-label', anchor: 'end' });
-    label(p, 'IN', -96, 22, { cls: 'terminal-label' });
+    label(p, 'IN', -114, -9, { cls: 'terminal-label', anchor: 'end' });
     return p;
 }
 function gpio(x, y, { model, state, notes = 'below' }) {
@@ -157,7 +165,7 @@ export function buildScene(config, point) {
     // low-side family: digital-npn, npn-low, nmos-low, npn-current-sink
     G = id === 'npn-current-sink' ? 10 : 14;
     const rl = s.add(rail(X, RAIL_Y)), r = RLED(X, below(RAIL_Y, LEAD)), l = LED(X, below(r.pins.b.y, LEAD));
-    const q = s.add(id === 'digital-npn' ? dtc('Q1', X, below(l.pins.k.y, TR), { name: model('Q1') })
+    const q = s.add(id === 'digital-npn' ? dtc('Q1', X, below(l.pins.k.y, 62), { name: model('Q1') })
         : id === 'nmos-low' ? mos('Q1', X, below(l.pins.k.y, TR), { polarity: 'nmos', name: model('Q1') })
         : bjt('Q1', X, below(l.pins.k.y, TR), { polarity: 'npn', name: model('Q1') }));
     s.wire('load', at(rl, 'b'), at(r, 'a')); s.wire('load', at(r, 'b'), at(l, 'a')); s.wire('load', at(l, 'k'), at(q, 't'));
@@ -166,12 +174,14 @@ export function buildScene(config, point) {
         const re = s.add(resV('RE', X, below(q.pins.e.y, LEAD), { value: config.emitterResistance, name: 'RE' }));
         s.wire('load', at(q, 'e'), at(re, 'a')); bottom = re;
     }
-    const exit = at(bottom, bottom.kind === 'resV' ? 'b' : 'e'), gnd = s.add(ground(X, exit[1] + (id === 'nmos-low' ? 40 : id === 'npn-current-sink' ? 10 : id === 'digital-npn' ? 40 : 22)));
+    const exit = at(bottom, bottom.kind === 'resV' ? 'b' : 'e'), gnd = s.add(ground(X, exit[1] + (id === 'nmos-low' ? 40 : id === 'npn-current-sink' ? 10 : 22)));
     s.wire('load', exit, at(gnd, 't'));
     if (id === 'digital-npn') {
         const g = gpioPart(75, q.y, 'above');
         s.wire('drive', at(g, 'r'), at(q, 'in'));
-        s.wire('drive', at(q, 'r2b'), [X, q.pins.r2b.y]);           // R2 returns to the emitter line
+        // inside the package: the pins' leads and R2's return to the emitter line
+        s.wire('drive', at(q, 'in'), at(q, 'in2')); s.wire('load', at(q, 't'), at(q, 'ct'));
+        s.wire('load', at(q, 'ee'), at(q, 'e')); s.wire('drive', at(q, 'r2b'), [X, q.pins.r2b.y]);
     } else if (id === 'nmos-low') {
         const g = baseDrive(s, gpioPart, q, 'RG', config.gateResistance), nodeX = 375;
         const rgs = s.add(resV('RGS', nodeX, g.y + LEAD, { value: config.gatePull, name: 'RGS', side: 'left', net: 'drive' }));

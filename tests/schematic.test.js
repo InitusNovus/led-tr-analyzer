@@ -112,13 +112,25 @@ test('text stays inside the canvas and never sits on a wire or another part or l
     }
 });
 
-test('the digital transistor has no enclosing box and keeps R1 / R2 as separate clickable parts', () => {
-    const scene = SCENES['digital-npn'], dtc = scene.parts.find(p => p.kind === 'dtc');
+test('the digital transistor reads as one package: a dashed outline that only the IN, C and E leads cross, R1 and R2 inside', () => {
+    const scene = SCENES['digital-npn'], dtc = scene.parts.find(p => p.kind === 'dtc'), o = dtc.outline;
+    assert.ok(o && o.w > 100, 'the outline exists');
+    const within = (x, y, m = 0) => x > o.x + m && x < o.x + o.w - m && y > o.y + m && y < o.y + o.h - m;
+    for (const n of ['in', 't', 'e']) assert.ok(!within(dtc.pins[n].x, dtc.pins[n].y), n + ' is a package pin, outside the outline');
+    for (const n of ['in2', 'ct', 'ee', 'b', 'r2b']) assert.ok(within(dtc.pins[n].x, dtc.pins[n].y, 2), n + ' is inside the package');
+    for (const b of dtc.boxes) assert.ok(b.x >= o.x + 4 && b.y >= o.y + 4 && b.x + b.w <= o.x + o.w - 4 && b.y + b.h <= o.y + o.h - 4, 'ring, R1 and R2 sit inside the outline');
+    const crossing = wireSegments(scene).filter(({ a, b }) => within(a[0], a[1]) !== within(b[0], b[1]));
+    assert.equal(crossing.length, 3, 'exactly the IN, C and E leads cross the outline');
+    for (const p of scene.parts.filter(q => q !== dtc)) for (const b of p.boxes) assert.ok(!rectsOverlap(b, o), p.id + ' stays out of the package');
+    const edges = [{ x: o.x - 1, y: o.y - 1, w: o.w + 2, h: 2 }, { x: o.x - 1, y: o.y + o.h - 1, w: o.w + 2, h: 2 },
+        { x: o.x - 1, y: o.y - 1, w: 2, h: o.h + 2 }, { x: o.x + o.w - 1, y: o.y - 1, w: 2, h: o.h + 2 }];
+    for (const p of scene.parts) for (const l of p.labels) for (const e of edges) assert.ok(!rectsOverlap(l.rect, e, 0), `"${l.text}" sits on the package outline`);
     assert.deepEqual(dtc.subHits, ['Q1.R1', 'Q1.R2']);
-    assert.ok(dtc.boxes.every(b => b.w <= 70 && b.h <= 70), 'no package-sized rectangle');
-    const nets_ = drawnNets(scene).map(n => n.join('|'));
-    assert.ok(nets_.includes('GND|Q1.E|Q1.R2'), 'R2 returns to the emitter: ' + nets_);
-    assert.ok(nets_.includes('Q1.B|Q1.R1'), 'R1 feeds the base');
+    const named = drawnNets(scene).map(n => n.join('|'));
+    assert.ok(named.includes('GND|Q1.E|Q1.R2'), 'R2 returns to the emitter: ' + named);
+    assert.ok(named.includes('Q1.B|Q1.R1'), 'R1 feeds the base');
+    assert.ok(named.includes('GPIO1.PIN|Q1.IN'), 'the GPIO reaches the package IN pin');
+    for (const id of Object.keys(SCENES).filter(i => i !== 'digital-npn')) assert.ok(!SCENES[id].parts.some(p => p.outline), id + ' has no package outline');
 });
 
 test('scenes also work for other LEDs, supplies and series counts', () => {
