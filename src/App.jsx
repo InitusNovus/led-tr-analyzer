@@ -117,7 +117,7 @@ export default function App(){
  const number=(name,label,unit='',step='any')=><NumberField key={name} name={name} label={label} unit={unit} step={step} value={config[name]} onChange={v=>set(name,v)}/>;
  const q1=getDeviceModel(config.deviceModels?.Q1),sizeSupported=t.supportedOperations.includes('size');
  return<>
- <header className="topbar"><div className="top-inner"><a href="/" className="back"><ArrowLeft size={16}/> Home</a><a href="https://github.com/InitusNovus/led-tr-analyzer" target="_blank" rel="noreferrer">Source <ExternalLink size={14}/></a></div></header>
+ <header className="topbar"><div className="top-inner"><a href="/" className="brand">InitusNovus</a><nav className="nav-links"><a href="/" className="back"><ArrowLeft size={16}/> Home</a><a href="https://github.com/InitusNovus/led-tr-analyzer" target="_blank" rel="noreferrer">Source <ExternalLink size={14}/></a></nav></div></header>
  <main className="shell">
   <div className="title-row"><div><div className="eyebrow"><Zap size={15}/> DATASHEET / DC</div><h1>LED-TR Analyzer</h1><p>실제 부품 모델과 회로 구조를 연결해 보는 축약 비선형 DC 분석기</p></div><div className="actions"><button onClick={reset}><RotateCcw size={15}/> 전체 초기화</button><button onClick={exportResult} disabled={!p}><Download size={15}/> 결과 JSON</button></div></div>
   <section className="workbench">
