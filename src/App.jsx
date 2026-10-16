@@ -5,7 +5,7 @@ import{designReducer,initialDesignState}from'./ui/designState.js';
 import{startCornerRun}from'./ui/cornerRunner.js';
 import{analyzePoint,analyzeCorners,selectResistance}from'./core/analysis.js';
 import{evaluateGoal,goalDrift,intentFromGoal}from'./core/goal.js';
-import{LEDS,SOURCES,PACKAGE_PRESETS,modelsForFamily,getDeviceModel}from'./data/catalog.js';
+import{LEDS,ledModel,ledIntensityBins,SOURCES,PACKAGE_PRESETS,modelsForFamily,getDeviceModel}from'./data/catalog.js';
 import{selectedParts,partEvidence,opticalEvidence,buildInstanceViews,goalVerdict,cornerPhase}from'./ui/viewModel.js';
 import CircuitDiagram from'./components/CircuitDiagram.jsx';
 import DesignSummary from './components/DesignSummary.jsx';
@@ -61,11 +61,12 @@ export default function App(){
  const setMode=v=>patch({mode:v}),setTargetMa=v=>patch({targetMa:v}),setTargetMcd=v=>patch({targetMcd:v}),
   setOpticalBasis=v=>patch({opticalBasis:v}),setSeries=v=>patch({series:v}),setStrategy=v=>patch({strategy:v}),
   setCriterion=v=>patch({criterion:v}),setMarginPct=v=>patch({marginPct:v}),setTolerancePct=v=>patch({tolerancePct:v}),setIncludeDtc=v=>patch({includeDtc:v}),setCornerSnapshot=v=>dispatch({type:'corners',snapshot:v}),setSelectedInstance=v=>patch({selectedInstance:v});
- const t=topologyById(config.topology),led=LEDS[config.led],optical=opticalEvidence(led);
+ const t=topologyById(config.topology),led=ledModel(config.led,config.ledBin),optical=opticalEvidence(led),ledBins=ledIntensityBins(config.led);
  const set=(key,value)=>dispatch({type:'config',key,value});
  const setDevice=(id,value)=>dispatch({type:'device',id,value});
  const changeTopology=id=>dispatch({type:'topology',id});
  const changeLed=id=>dispatch({type:'led',id});
+ const changeLedBin=bin=>dispatch({type:'ledBin',bin});
  const changeTargetKind=kind=>dispatch({type:'targetKind',kind});
  const opticalCap=opticalCapability(led);
  const result=useMemo(()=>{
@@ -116,7 +117,7 @@ export default function App(){
  },[mode,result,appliedGoal,p,config]);
  const applyGoal=()=>dispatch({type:'applyGoal',intent:intentFromGoal(result.sizing.goal,{series,strategy}),
    selectedResistance:result.sizing.selected,exactResistance:result.sizing.exact});
- const exportResult=()=>{if(!p)return;const modelSnapshot=selectedParts(p.config,t).map(x=>({instanceId:x.instanceId,modelId:x.modelId,source:x.part.source,sourceRevision:SOURCES[x.part.source]?.revision??null,modelKind:x.part.modelKind??x.part.kind??null}));const report={schemaVersion:4,application:'LED-TR Analyzer',scope:'datasheet-based reduced DC model, not SPICE',inputDraft:config,designIntent:{mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy,criterion,tolerancePct},appliedConfiguration:p.config,modelSnapshot,result,corners,optical:p.optical,goal:goalView,editingGoal:result.sizing?.goal??null,appliedGoal:appliedGoal?{intent:appliedGoal.intent,selectedResistance:appliedGoal.selectedResistance,exactResistance:appliedGoal.exactResistance,configSnapshot:appliedGoal.snapshot,evaluation:evaluateGoal(p,appliedGoal.intent),drift:goalDrift(appliedGoal.snapshot,config)}:null,migrationNote:'v4 keeps the applied goal, its configuration snapshot and a live re-evaluation; v3 had only the sizing-time goal; v2 stored exact model IDs.'};const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='led-tr-analysis-v4.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+ const exportResult=()=>{if(!p)return;const modelSnapshot=selectedParts(p.config,t).map(x=>({instanceId:x.instanceId,modelId:x.modelId,...(x.instanceId==='LED1'?{selectedIntensityBin:p.config.ledBin??null}:{}),source:x.part.source,sourceRevision:SOURCES[x.part.source]?.revision??null,modelKind:x.part.modelKind??x.part.kind??null}));const report={schemaVersion:4,application:'LED-TR Analyzer',scope:'datasheet-based reduced DC model, not SPICE',inputDraft:config,designIntent:{mode,targetMa,targetMcd,targetKind,opticalBasis,series,strategy,criterion,tolerancePct},appliedConfiguration:p.config,modelSnapshot,result,corners,optical:p.optical,goal:goalView,editingGoal:result.sizing?.goal??null,appliedGoal:appliedGoal?{intent:appliedGoal.intent,selectedResistance:appliedGoal.selectedResistance,exactResistance:appliedGoal.exactResistance,configSnapshot:appliedGoal.snapshot,evaluation:evaluateGoal(p,appliedGoal.intent),drift:goalDrift(appliedGoal.snapshot,config)}:null,migrationNote:'LED1 records selectedIntensityBin (null = whole datasheet range) and the configuration carries ledBin; v4 keeps the applied goal, its configuration snapshot and a live re-evaluation; v3 had only the sizing-time goal; v2 stored exact model IDs.'};const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='led-tr-analysis-v4.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
  const number=(name,label,unit='',step='any')=><NumberField key={name} name={name} label={label} unit={unit} step={step} value={config[name]} onChange={v=>set(name,v)}/>;
  const ratingSummary=`RLED 정격 ${show(config.resistorRating,1000,'mW')} × ${config.derating} = ${show(config.resistorRating*config.derating,1000,'mW')} · 주변 ${config.ambient}°C · 여유 경고 ${marginPct}%`;
  const ledgerSummary=result.ok?`${p.ledger.length}개 소자 · ${result.validation.label}`:'';
@@ -134,6 +135,14 @@ export default function App(){
     <p className="subtle">{t.path}<br/>토폴로지 전환 시 기본 ON 상태({t.active})로 설정됩니다.</p>
     <details className="topology-gallery"><summary>지원 회로 13종 보기</summary><div className="topology-cards">{TOPOLOGIES.map(x=><button key={x.id} className={cls(config.topology===x.id&&'active')} onClick={()=>changeTopology(x.id)}><b>{x.name}</b><small>{x.path}</small></button>)}</div></details>
     <label className="field" htmlFor="led"><span>LED1</span><select id="led" value={config.led} onChange={e=>changeLed(e.target.value)}>{Object.values(LEDS).map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+    {ledBins.length>0&&<div className="led-bin" data-testid="led-bin">
+      <label className="field" htmlFor="led-bin"><span>광도 등급 (bin)<small>선택 안 하면 전체 범위</small></span>
+       <select id="led-bin" value={config.ledBin??''} onChange={e=>changeLedBin(e.target.value)}>
+        <option value="">미지정 · 전체 {ledModel(config.led).optical.minMcd}–{ledModel(config.led).optical.maxMcd} mcd</option>
+        {ledBins.map(b=><option key={b.id} value={b.id}>{b.id} · {b.min}–{b.max} mcd @ {ledModel(config.led).optical.testCurrent*1000} mA</option>)}
+       </select></label>
+      <small className="subtle led-bin-help">데이터시트의 광도 bin은 P코드(P19 …)입니다. 품번 끝의 R1–R5 같은 코드는 같은 데이터시트에서 <b>파장 bin</b>이며 밝기와는 별개입니다. 등급을 고르면 광도 범위와 목표 역산이 그 범위로 좁아지고, 고르지 않으면 지금처럼 전체 bin 범위를 씁니다. 등급은 보증값이 아니라 제조사 분류 범위입니다.</small>
+    </div>}
     <div className="part-meta"><span>{led.kind}</span><span>{optical.label}</span></div><QuickSpecs part={led} heading="LED 시험조건·광도 범위"/>
     <div className="supply-grid">{number('vcc','VLED / collector rail','V')}{topologyUsesGPIO(t)&&number('vdd',config.deviceModels?.GPIO1==='assumed:DC-Thevenin'?'제어원 HIGH 전압':'GPIO 전원','V')}{number('seriesCount','직렬 LED','개',1)}{number('temperature','전기 모델 온도','°C')}</div>
     <div className="device-slots" id="device-slots">{t.deviceSlots.map(slot=><PartPicker key={slot.id} slot={slot} modelId={config.deviceModels?.[slot.id]??slot.defaultModelId} onChange={setDevice} onInspect={setSelectedInstance}/>)}</div>

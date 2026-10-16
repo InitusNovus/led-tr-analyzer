@@ -6,7 +6,7 @@ export const SOURCES = {
     kentoG: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2297.pdf' },
     kentoB: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2293.pdf' },
     kentoYG: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2292.pdf' },
-    kentoY: { manufacturer: 'Hubei KENTO', revision: 'KT-0A approval sheet located; electrical test-current rows not parsed in this audit', url: 'https://www.lcsc.com/datasheet/C2296.pdf' },
+    kentoY: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2296.pdf' },
     kentoO: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C110371.pdf' },
     kentoW: { manufacturer: 'Shenzhen/Hubei KENTO', revision: 'A3 / 2017-05-16 · C34499-associated sheet', url: 'https://datasheet.lcsc.com/lcsc/2305091500_Hubei-KENTO-Elec-KT-0805W_C34499.pdf' },
     dtc: { manufacturer: 'ROHM', revision: 'Rev.002 / 2016-03-25', url: 'https://fscdn.rohm.com/en/products/databook/datasheet/discrete/transistor/digital/dtc043zebtl-e.pdf' },
@@ -47,8 +47,18 @@ export const LEDS = {
 // Electrical tables and typical curves are kept distinct; no midpoint is presented as a guaranteed typical value.
 const kentoTemp = (source) => graph(source, 'p.5 Relative intensity vs. ambient temperature', 'Ta curve; typical, coarse manual reading', [[-40, 1.10], [0, 1.04], [25, 1.00], [50, .95], [85, .86]], false);
 const kentoDerating = (source, rated, end) => graph(source, 'p.5 Maximum forward current vs. ambient temperature', 'typical/reference derating graphic', [[-40, rated], [25, rated], [85, end]], false);
-const kentoOptical = (source, testCurrent, minMcd, maxMcd, points) => ({
+/** Datasheet p.4 section 6: every KENTO colour is sorted into luminous-intensity (P##), forward-voltage (V#) and wavelength bins.
+ * The part number suffix (e.g. the 2 in KT-0805R2) is NOT documented in these sheets; see docs/MODELS.md. */
+const binRows = rows => rows.map(([id, min, max]) => ({ id, min, max }));
+const kentoBins = (voltage, wavelength) => ({
+    voltage: { current: voltage.current, tolerance: '±0.05 V', source: 'p.4 §6.2', rows: binRows(voltage.rows) },
+    wavelength: { current: wavelength.current, tolerance: wavelength.tolerance ?? '±1 nm', source: 'p.4 §6.3', rows: binRows(wavelength.rows) },
+});
+const VBIN_20 = { current: .02, rows: [['VE', 1.8, 1.9], ['VF', 1.9, 2.0], ['VG', 2.0, 2.1], ['VH', 2.1, 2.2], ['VI', 2.2, 2.3], ['VJ', 2.3, 2.4]] };
+const VBIN_5 = { current: .005, rows: [['VM', 2.6, 2.7], ['VN', 2.7, 2.8], ['VO', 2.8, 2.9], ['VP', 2.9, 3.0], ['VQ', 3.0, 3.1]] };
+const kentoOptical = (source, testCurrent, minMcd, maxMcd, points, intensityBins = []) => ({
     nominalMcd: null, minMcd, maxMcd, testCurrent,
+    intensityBins: binRows(intensityBins),
     convention: 'Datasheet gives a min/max intensity bin range, not a single typical absolute-intensity anchor.',
     relative: graph(source, 'p.5 Relative intensity vs. forward current', 'Ta=25°C; normalized near 20mA; typical, coarse manual reading', mA(points), false),
     temperature: kentoTemp(source),
@@ -59,7 +69,9 @@ Object.assign(LEDS, {
         vf: graph('kentoR', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, coarse manual reading', mA([[1,1.87],[5,1.95],[10,2.00],[15,2.04],[20,2.08],[25,2.11],[30,2.14],[35,2.17]]), false),
         vfTest: { current: .01, min: 1.8, typ: null, max: 2.4, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
         vfBins: { current: .02, min: 1.8, max: 2.4, condition: 'p.4 voltage bin table; note different current from p.3 Vf row' },
-        optical: kentoOptical('kentoR', .02, 85, 210, [[0,0],[5,.28],[10,.52],[15,.76],[20,1],[25,1.18],[30,1.36],[35,1.46],[40,1.55]]),
+        optical: kentoOptical('kentoR', .02, 85, 210, [[0,0],[5,.28],[10,.52],[15,.76],[20,1],[25,1.18],[30,1.36],[35,1.46],[40,1.55]],
+            [['P19', 85, 100], ['P20', 100, 120], ['P21', 120, 145], ['P22', 145, 175], ['P23', 175, 210]]),
+        bins: kentoBins(VBIN_20, { current: .02, rows: [['R1', 615, 618], ['R2', 618, 621], ['R3', 621, 624], ['R4', 624, 627], ['R5', 627, 630]] }),
         limits: { current: .025, pulseCurrent: .06, power: .04, reverse: 5, maxTemperature: 85, minTemperature: -40 },
         currentDerating: kentoDerating('kentoR', .025, .006),
         notes: ['Vf table: 1.8–2.4V @10mA; voltage-bin table separately uses20mA.', 'IV is 85–210mcd @20mA: no single absolute typical mcd is invented.'],
@@ -68,7 +80,9 @@ Object.assign(LEDS, {
         id: 'KT-0805G', name: 'KT-0805G (Emerald Green) · Hubei KENTO', color: '#38b078', source: 'kentoG', kind: 'manual-curve', lcscId: 'C2297',
         vf: graph('kentoG', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, coarse manual reading', mA([[1,2.40],[5,2.63],[10,2.82],[15,2.95],[20,3.04],[25,3.11],[30,3.16],[35,3.20],[40,3.24]]), false),
         vfTest: { current: .005, min: 2.6, typ: null, max: 3.1, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
-        optical: kentoOptical('kentoG', .005, 175, 430, [[0,0],[5,.40],[10,.65],[15,.84],[20,1],[25,1.12],[30,1.23],[35,1.33],[40,1.40]]),
+        optical: kentoOptical('kentoG', .005, 175, 430, [[0,0],[5,.40],[10,.65],[15,.84],[20,1],[25,1.12],[30,1.23],[35,1.33],[40,1.40]],
+            [['P23', 175, 210], ['P24', 210, 250], ['P25', 250, 300], ['P26', 300, 360], ['P27', 360, 430]]),
+        bins: kentoBins(VBIN_5, { current: .005, rows: [['G2', 513, 516], ['G3', 516, 519], ['G4', 519, 522], ['G5', 522, 525], ['G6', 525, 528]] }),
         limits: { current: .03, pulseCurrent: .06, power: .10, reverse: 5, maxTemperature: 85, minTemperature: -40 },
         currentDerating: kentoDerating('kentoG', .03, .007),
         notes: ['Vf 2.6–3.1V and IV 175–430mcd are both specified @5mA.', 'Absolute DC current is30mA; 60mA is a pulsed rating, not DC.'],
@@ -77,7 +91,9 @@ Object.assign(LEDS, {
         id: 'KT-0805B', name: 'KT-0805B (Blue) · Hubei KENTO', color: '#5599ed', source: 'kentoB', kind: 'manual-curve', lcscId: 'C2293',
         vf: graph('kentoB', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, coarse manual reading', mA([[1,2.65],[5,2.80],[10,2.90],[15,2.97],[20,3.02],[25,3.06],[30,3.10],[35,3.13],[40,3.15]]), false),
         vfTest: { current: .005, min: 2.6, typ: null, max: 3.1, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
-        optical: kentoOptical('kentoB', .005, 34, 100, [[0,0],[5,.35],[10,.57],[15,.80],[20,1],[25,1.12],[30,1.25],[35,1.40],[40,1.50]]),
+        optical: kentoOptical('kentoB', .005, 34, 100, [[0,0],[5,.35],[10,.57],[15,.80],[20,1],[25,1.12],[30,1.25],[35,1.40],[40,1.50]],
+            [['P14', 34, 40], ['P15', 40, 58], ['P16', 58, 70], ['P17', 70, 85], ['P18', 85, 100]]),
+        bins: kentoBins(VBIN_5, { current: .005, rows: [['B4', 460, 463], ['B5', 463, 466], ['B6', 466, 469], ['B7', 469, 472], ['B8', 472, 475]] }),
         limits: { current: .03, pulseCurrent: .06, power: .10, reverse: 5, maxTemperature: 85, minTemperature: -40 },
         currentDerating: kentoDerating('kentoB', .03, .007),
         notes: ['Vf 2.6–3.1V and IV 34–100mcd are both specified @5mA.', 'Typical curve is not a production min/max envelope.'],
@@ -87,25 +103,34 @@ Object.assign(LEDS, {
         vf: graph('kentoYG', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, coarse manual reading', mA([[1,1.87],[5,1.93],[10,1.97],[20,2.02],[30,2.05],[35,2.07]]), false),
         vfTest: { current: .01, min: 1.8, typ: null, max: 2.4, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
         vfBins: { current: .02, min: 1.8, max: 2.4, condition: 'p.4 voltage bin table' },
-        optical: kentoOptical('kentoYG', .02, 24, 70, [[0,0],[5,.30],[10,.63],[15,.84],[20,1],[25,1.10],[30,1.16],[35,1.20],[40,1.21]]),
+        optical: kentoOptical('kentoYG', .02, 24, 70, [[0,0],[5,.30],[10,.63],[15,.84],[20,1],[25,1.10],[30,1.16],[35,1.20],[40,1.21]],
+            [['P12', 24, 28], ['P13', 28, 34], ['P14', 34, 40], ['P15', 40, 48], ['P16', 48, 58], ['P17', 58, 70]]),
+        bins: kentoBins(VBIN_20, { current: .02, tolerance: '±0.5 nm', rows: [['YG9', 568, 569], ['YG10', 569, 570], ['YG11', 570, 571], ['YG12', 571, 572], ['YG13', 572, 573], ['YG14', 573, 574]] }),
         limits: { current: .025, pulseCurrent: .06, power: .04, reverse: 5, maxTemperature: 85, minTemperature: -40 },
         currentDerating: kentoDerating('kentoYG', .025, .006),
         notes: ['Vf table is 1.8–2.4V @10mA; IV is24–70mcd @20mA.', 'Absolute DC current is25mA.'],
     },
     'KT-0805Y': {
         id: 'KT-0805Y', name: 'KT-0805Y (Yellow) · Hubei KENTO', color: '#d7ae39', source: 'kentoY', kind: 'datasheet-table-only', lcscId: 'C2296',
-        vfTableOnly: { current: null, min: 1.8, max: 2.4, nominalAssumption: 2.1, condition: 'LCSC/JLCPCB product/datasheet metadata; parsed listing does not expose the Vf test current' },
-        vfTest: { current: null, min: 1.8, typ: null, max: 2.4, condition: 'Test current not verified from a readable source row in this audit' },
-        optical: { nominalMcd: null, minMcd: null, maxMcd: 175, testCurrent: null, relative: null, temperature: null, convention: 'Distributor metadata exposes 175mcd but not its test current in the parsed listing; no scalar optical model is used.' },
-        limits: { current: null, pulseCurrent: null, power: .04, reverse: null, maxTemperature: 85, minTemperature: -40 },
-        notes: ['C2296 source identity, Vf 1.8–2.4V, 175mcd, 40mW and −40…85°C are verified from LCSC/JLCPCB metadata.', 'Forward-current/pulse/reverse limits and Vf/IV test currents remain unknown here; sibling KT parts are not used to fill them.', 'Vf uses an explicitly labeled 2.1V midpoint sensitivity approximation until the exact table row is reviewed.'],
+        vfTableOnly: { current: .01, min: 1.8, max: 2.4, nominalAssumption: 2.1, condition: 'p.3 Electrical/optical characteristics, Ta=25°C (A.0 / 2018-12-06); midpoint is an explicit table-only assumption, the forward curve is not digitized' },
+        vfTest: { current: .01, min: 1.8, typ: null, max: 2.4, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
+        vfBins: { current: .02, min: 1.8, max: 2.4, condition: 'p.4 voltage bin table' },
+        // Own sheet (A.0 / 2018-12-06): 70–175 mcd at IF=20mA. The relative-current curve on p.5 is not digitized, so the model is a test point only.
+        optical: { nominalMcd: null, minMcd: 70, maxMcd: 175, testCurrent: .02, relative: null, temperature: null,
+            intensityBins: binRows([['P18', 70, 85], ['P19', 85, 100], ['P20', 100, 120], ['P21', 120, 145], ['P22', 145, 175]]),
+            convention: 'Datasheet gives a min/max intensity bin range at the 20mA test point only; the p.5 relative-current curve is not digitized, so no other current is modeled.' },
+        bins: kentoBins(VBIN_20, { current: .02, rows: [['Y3', 584, 586], ['Y4', 586, 588], ['Y5', 588, 590], ['Y6', 590, 592], ['Y7', 592, 594]] }),
+        limits: { current: .025, pulseCurrent: .06, power: .04, reverse: 5, maxTemperature: 85, minTemperature: -40 },
+        notes: ['C2296 A.0 / 2018-12-06 sheet: IV 70–175mcd @20mA, Vf 1.8–2.4V @10mA, Pd 40mW, IF 25mA, IFP 60mA (1/10 duty, 0.1ms), VR 5V, −40…85°C.', 'The p.5 curves (Vf, relative intensity vs current and temperature) are not digitized here, so Vf uses an explicitly labeled 2.1V midpoint and optical output exists only at the 20mA test point.', 'Sibling KT parts are not used to fill any value.'],
     },
     'KT-0805O': {
         id: 'KT-0805O', name: 'KT-0805O (Orange) · Hubei KENTO', color: '#ef933f', source: 'kentoO', kind: 'manual-curve', lcscId: 'C110371',
         vf: graph('kentoO', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, coarse manual reading', mA([[1,1.85],[5,1.94],[10,1.99],[20,2.04],[30,2.08],[35,2.10]]), false),
         vfTest: { current: .01, min: 1.8, typ: null, max: 2.4, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
         vfBins: { current: .02, min: 1.8, max: 2.4, condition: 'p.4 voltage bin table' },
-        optical: kentoOptical('kentoO', .02, 70, 175, [[0,0],[5,.32],[10,.62],[15,.84],[20,1],[25,1.10],[30,1.16],[35,1.18],[40,1.16]]),
+        optical: kentoOptical('kentoO', .02, 70, 175, [[0,0],[5,.32],[10,.62],[15,.84],[20,1],[25,1.10],[30,1.16],[35,1.18],[40,1.16]],
+            [['P18', 70, 85], ['P19', 85, 100], ['P20', 100, 120], ['P21', 120, 145], ['P22', 145, 175]]),
+        bins: kentoBins(VBIN_20, { current: .02, rows: [['O2', 598, 600], ['O3', 600, 602], ['O4', 602, 604], ['O5', 604, 606], ['O6', 606, 608]] }),
         limits: { current: .025, pulseCurrent: .06, power: .04, reverse: 5, maxTemperature: 85, minTemperature: -40 },
         currentDerating: kentoDerating('kentoO', .025, .006),
         notes: ['Vf table is 1.8–2.4V @10mA; IV is70–175mcd @20mA.', 'Typical curve points were read from the same C110371 approval sheet.'],
@@ -275,3 +300,22 @@ export function getDeviceModel(modelId) { return DEVICE_MODELS[modelId] ?? null;
 export function modelsForFamily(family) { return Object.values(DEVICE_MODELS).filter(p => p.family === family); }
 
 export const PACKAGE_PRESETS = { '0402': .0625, '0603': .1, '0805': .125, '1206': .25 };
+
+/** An LED with one of its datasheet luminous-intensity bins selected: the range narrows to that bin and the typical
+ * anchor is dropped (a typ value would describe the whole population, not the bin). Unknown bins return undefined. */
+const BINNED = new Map();
+export function ledModel(id, binId = null) {
+    const led = LEDS[id];
+    if (!led || binId == null || binId === '') return led;
+    const key = id + '|' + binId;
+    if (BINNED.has(key)) return BINNED.get(key);
+    const bin = led.optical?.intensityBins?.find(b => b.id === binId);
+    const model = bin ? {
+        ...led, selectedBin: bin.id,
+        optical: { ...led.optical, nominalMcd: null, minMcd: bin.min, maxMcd: bin.max, selectedBin: bin.id,
+            convention: (led.optical.convention ?? '') + ` Selected datasheet intensity bin ${bin.id}: ${bin.min}–${bin.max} mcd at the test current.` },
+    } : undefined;
+    BINNED.set(key, model);
+    return model;
+}
+export const ledIntensityBins = id => LEDS[id]?.optical?.intensityBins ?? [];

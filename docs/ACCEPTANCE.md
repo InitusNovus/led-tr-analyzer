@@ -53,10 +53,11 @@
 | G12 | 전력 막대의 nominal/peak 분리, generic preset 구별 | #26 | 구현 (마커 3종, 필요 정격, preset 정렬·적용·재검증) | 9 |
 | G13 | E-series/공차 slider·numeric·touch/keyboard | #28 | 구현 (프리셋↔입력값 양방향, 계열 선택이 공차를 바꾸지 않음, 눈금 구분, 값 표기 3단계와 입력 연동, 키보드, 390px 겹침 없음) | 22 |
 | G14 | 모바일 회로 가독성·scroll·mode 전환·overflow 없음 | #23 #29 | 구현 (overflow, 중앙 정렬, 글자 크기, 모바일 순서와 결과 띠 한 줄, 모바일 모드 전환이 회로 위치와 가로 폭을 바꾸지 않음) | 12 |
+| G15 | KENTO 광도 등급(bin) 선택 → 광도 범위·역산·내보내기 (#41) | #41 | 구현 (bin 목록과 P코드/파장 bin 설명, 선택 시 범위가 전체 범위 안에서 좁아짐, 목표 역산 저항이 달라짐, JSON에 기록, LED 변경 시 해제, bin 없는 LED는 선택기 없음) | 13 |
 
 ## 3. 증거와 실행 방법
 
-- 단위·계약 테스트: `npm test` (226개). 브라우저: `npm run test:browser` (실제 `/led-tr-analyzer/` subpath, 336 checks, 시나리오별 집계 출력).
+- 단위·계약 테스트: `npm test` (234개). 브라우저: `npm run test:browser` (실제 `/led-tr-analyzer/` subpath, 352 checks, 시나리오별 집계 출력).
 - 화면 증거: smoke가 `test-results/`에 토폴로지 13종 atlas와 모바일 전체 화면을 저장하고, CI가 `browser-evidence-<run id>` 아티팩트로 14일간 보관합니다.
 - 시나리오가 실패하면 smoke가 `SMOKE_FAILED scenario=<ID>`를 출력합니다.
 
@@ -79,14 +80,16 @@
 | 빠른 스펙 핵심 줄 제거 | G02 |
 | mcd 가이드 제거 | G03 |
 | 모바일 회로 확대 배율 축소 | G13 |
+| 광도 bin을 계산에서 무시 (#41) | G15, 단위 테스트 (`tests/led-bin.test.js`) |
+| LED를 바꿔도 bin이 남음 (#41) | G15, 단위 테스트 |
 
-13건 모두 의도한 곳에서 실패했습니다 (`python scripts/mutation_check.py`).
+15건 모두 의도한 곳에서 실패했습니다 (`python scripts/mutation_check.py`).
 
 ## 5. 최종 판정과 후속 이슈
 
 - 감사표(§1)의 모든 항목이 `복구` 또는 `동등 대체`로 확정됐고 `대기`는 없습니다.
 - #28(P2)은 이관·제외 없이 모두 구현했습니다.
-- #21 범위 밖 후속 요청은 별도 이슈로 관리합니다: 폰트 개선 #40, KENTO KT 광도 등급 조사·반영 #41. 두 이슈는 이 gate의 완료 조건이 아닙니다.
+- #21 범위 밖 후속 요청은 별도 이슈로 관리합니다: 폰트 개선 #40(완료), KENTO KT 광도 등급 조사·반영 #41 (docs/MODELS.md에 조사 결과). 두 이슈는 이 gate의 완료 조건이 아닙니다.
 
 ## 6. PR 증거 규칙
 

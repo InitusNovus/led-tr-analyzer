@@ -32,17 +32,58 @@
 | KT-0805G | C2297 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 2.6–3.1V @5mA; IV 175–430mcd @5mA; IF 30mA; Pd 100mW |
 | KT-0805B | C2293 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 2.6–3.1V @5mA; IV 34–100mcd @5mA; IF 30mA; Pd 100mW |
 | KT-0805YG | C2292 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 1.8–2.4V @10mA; IV 24–70mcd @20mA; IF 25mA; Pd 40mW |
-| KT-0805Y | C2296 | KT-0A approval sheet identity + LCSC/JLCPCB metadata; exact current rows not readable in this audit | Vf 1.8–2.4V; IV metadata 175mcd; Pd 40mW; −40…85°C. Test currents and IF/IFP/VR are left unknown |
+| KT-0805Y | C2296 | Hubei KENTO A.0, 2018-12-06 (이슈 #41에서 원문 확인); p.5 곡선은 아직 수동 추출 안 함 | Vf 1.8–2.4V @10mA; IV 70–175mcd @20mA; IF 25mA; IFP 60mA; Pd 40mW; VR 5V; −40…85°C |
 | KT-0805O | C110371 | Hubei KENTO A.0, 2018-12-06; p.5 curve 수동 추출 | Vf 1.8–2.4V @10mA; IV 70–175mcd @20mA; IF 25mA; Pd 40mW |
 | KT-0805W | C34499 | C34499-associated KENTO A3, 2017-05-16을 pin | Vf 2.6–3.2V @5mA; IV typ 350mcd @5mA; IF 25mA; Pd 80mW |
 
 R/G/B/YG/O는 같은 원문에 실린 Typical Electrical-Optical Characteristics Curves를 거칠게 수동 판독하여 `manual-curve`로 사용합니다. 곡선은 전형값이며 생산 분포의 보증곡선이 아닙니다. R/YG/O의 p.3 Vf 행은 10mA인데 p.4 voltage-bin 표는 20mA이므로 서로 다른 시험조건으로 따로 저장합니다.
 
-Y는 source identity와 LCSC/JLCPCB에서 노출되는 Vf 1.8–2.4V, 175mcd, 40mW, −40…85°C는 확인했지만, 현재 접근 가능한 원문에서 Vf/IV 시험전류와 IF/IFP/VR 행을 신뢰성 있게 추출하지 못했습니다. 따라서 형제 KT 품번의 값을 복사하지 않고 해당 항목은 unknown으로 둡니다. `datasheet-table-only`의 2.1V midpoint는 **명시적 계산 가정**이며 모든 전류에서 current-shape 미모델링 플래그를 냅니다.
+Y는 이슈 #41에서 LCSC 원문(A.0, 2018-12-06)을 직접 읽어 IV 70–175mcd @20mA, Vf 1.8–2.4V @10mA, IF/IFP/VR/Pd를 확인했습니다. p.5의 Vf·상대광도 곡선은 아직 수동 판독하지 않았으므로 Vf는 2.1V midpoint 가정(`table-only`)이고 광도는 **20mA 시험점에서만** 70–175mcd 범위로 반환합니다 (다른 전류는 `unavailable`, 역산 불가). 형제 KT의 값은 어떤 항목에도 빌려 쓰지 않습니다.
 
 White C34499는 웹의 다른 mirror에 같은 제품명/비슷한 revision을 가진 사본이 있으나 Pd, IF 및 광학 시험조건이 C34499-associated LCSC 문서와 충돌합니다. 이 모델은 **LCSC에 직접 연결된 A3 2017-05-16 문서**만 pin하고 다른 mirror의 숫자를 합치지 않습니다. 동일 source의 current-dependence curve를 이번 PR에서 확인하지 못했으므로 Vf는 2.6–3.2V의 midpoint 2.9V를 명시적 table-only 가정으로 사용하고, 광도 350mcd는 정확히 5mA/25°C 시험점에서만 반환합니다.
 
 R/G/B/YG/Y/O의 데이터시트 광도는 min/max bin 범위이고 단일 typ 절대광도가 아닙니다. 상대 광도 곡선은 보관하더라도 그 범위를 임의의 midpoint “typ mcd”로 바꾸지 않으며, 현재 UI의 scalar mcd 출력은 `null`입니다. 추후 bin 선택/범위 출력 UI를 별도 구현할 수 있습니다.
+
+## KENTO 등급(bin) 조사와 광도 등급 선택 (이슈 #41)
+
+2026-10-16에 LCSC의 KT-0805 R/G/B/YG/Y/O/W 승인서(공통 A.0, 2018-12-06, 11쪽)를 직접 읽고 p.3–4의 **bin 표**를 정리했습니다. 승인서는 색마다 세 종류의 bin을 정의합니다.
+
+| 종류 | 코드 | 의미 | 조건 | 허용차 |
+|---|---|---|---|---|
+| 광도 (§6.1) | `P12`–`P27` | 해당 시험전류에서의 광도 범위 | 색마다 5 또는 20 mA | ±10% |
+| 전압 (§6.2) | `VE`–`VJ` (20 mA 색), `VM`–`VQ` (5 mA 색) | Vf 범위 | 20 또는 5 mA | ±0.05 V |
+| 파장 (§6.3) | `R1`–`R5`, `G2`–`G6`, `B4`–`B8`, `YG9`–`YG14`, `Y3`–`Y7`, `O2`–`O6` | 주파장 범위 | 20 또는 5 mA | ±1 nm (YG ±0.5 nm) |
+
+**`KT-0805R2`처럼 품번 끝에 붙는 숫자는 밝기 등급이 아닐 가능성이 큽니다.** 데이터시트에서 `R1`–`R5`는 **빨강의 파장 bin**(R2 = 618–621 nm)이고, 밝기 bin은 `P19`–`P23`입니다. 다만 승인서에는 품번(ordering code) 체계 설명이 없고 판매처에서도 `KT-0805R2` 목록을 찾지 못해서, 접미사가 실제로 무엇을 뜻하는지는 **확인되지 않았습니다** (제조사 문의나 판매처 상품 라벨이 필요). 그래서 앱은 접미사를 해석하지 않고, 데이터시트가 정의한 P코드를 광도 등급으로만 사용합니다.
+
+### 광도 bin (§6.1)
+
+| LED | 시험전류 | bin → 범위 (mcd) |
+|---|---|---|
+| KT-0805R | 20 mA | P19 85–100 · P20 100–120 · P21 120–145 · P22 145–175 · P23 175–210 |
+| KT-0805G | 5 mA | P23 175–210 · P24 210–250 · P25 250–300 · P26 300–360 · P27 360–430 |
+| KT-0805B | 5 mA | P14 34–40 · P15 40–58 · P16 58–70 · P17 70–85 · P18 85–100 |
+| KT-0805YG | 20 mA | P12 24–28 · P13 28–34 · P14 34–40 · P15 40–48 · P16 48–58 · P17 58–70 |
+| KT-0805Y | 20 mA | P18 70–85 · P19 85–100 · P20 100–120 · P21 120–145 · P22 145–175 |
+| KT-0805O | 20 mA | P18 70–85 · P19 85–100 · P20 100–120 · P21 120–145 · P22 145–175 |
+
+각 색의 bin을 이으면 기존에 쓰던 전체 범위(R 85–210, G 175–430, B 34–100, YG 24–70, Y 70–175, O 70–175)와 정확히 같습니다. 즉 기존 값은 "모든 bin의 합집합"이었고, `tests/led-bin.test.js`가 이 연속성을 확인합니다. 같은 P코드라도 색마다 범위와 시험전류가 다릅니다(예: `P23`은 R에서 175–210 mcd @20 mA, G에서 175–210 mcd @5 mA).
+
+전압·파장 bin은 `LEDS[...].bins`에 조건과 함께 보관하고 빠른 스펙에 표시만 합니다. Vf 모델은 곡선 기반이라 전압 bin으로 좁히지 않았습니다.
+
+### 계산에서의 동작
+
+- `config.ledBin`(기본 `null`)이 있으면 LED의 광도 범위가 그 bin의 min–max로 좁아지고, **typ 값은 버립니다** (typ는 bin이 아니라 전체 모집단의 값이기 때문입니다). 시험전류가 아닌 전류·온도에서는 기존과 같은 상대곡선 배율 `R(I)/R(I_test)`를 그 범위에 곱합니다.
+- 목표 광도 역산(`solveOpticalCurrent`)과 저항 선정, 목표 판정, 민감도 분석이 모두 같은 bin을 씁니다. 전기 동작점(전류·전압)은 bin과 무관합니다.
+- bin을 고르지 않으면 이전과 수치가 완전히 같습니다. 존재하지 않는 bin은 `invalid-input`으로 거절하고, LED를 바꾸면 bin은 해제됩니다 (bin은 LED마다 다릅니다).
+- JSON 내보내기: `inputDraft/appliedConfiguration.ledBin`, `modelSnapshot[LED1].selectedIntensityBin`.
+- 등급은 제조사 분류 범위이며 보증이 아닙니다 (표 허용차 ±10%는 별도).
+
+### 남은 불확실성
+
+- **White(C34499)**: LCSC가 지금 연결하는 승인서는 `0805BC`(A.0, 2018-12-06)로, IV 145–360 mcd @5 mA(bin P22–P26), Vf 2.6–3.1 V이며 색좌표 bin(BC1–BC7)을 씁니다. 이 모델이 pin한 A3 2017-05-16 문서(Vf 2.6–3.2 V, typ 350 mcd)와 값이 달라서, 두 문서를 섞지 않기 위해 White에는 bin을 넣지 않았습니다. 어느 문서가 해당 품번의 실제 사양인지는 제조사/판매처 확인이 필요합니다.
+- **Y의 p.5 곡선**은 아직 수동 판독하지 않았습니다. 판독하면 다른 전류에서의 광도 추정과 역산이 가능해집니다.
+- 품번 접미사(`R2` 등)의 의미는 위와 같이 미확인입니다.
 
 ## 실제 부품 model ID와 회로 슬롯
 
@@ -130,7 +171,7 @@ Iv_max_est(I) = Iv_max(I_test) * scale(I)
 
 **의미상 주의:** 제조사 bin min/max는 해당 **시험점**의 특성입니다. 다른 전류·온도로 전형곡선을 곱한 결과는 보증 최저/최고값이 아닙니다. `basis='min'`은 “최저 bin *기준* 추정”이며 보증최소 광도나 생산 수율 예측이 아닙니다. 중간 대표값 역시 제조사 typ가 아닙니다.
 
-온도 곡선은 제공된 경우 `R_T(T)/R_T(25C)`를 추가로 곱하고 전류·온도 분리가능성 근사를 플래그로 표시합니다. 곡선 바깥의 forward 추정은 extrapolation 플래그가 붙습니다. **광도 목표 역산은 곡선의 수집된 점 구간만 탐색**하고 상승 구간을 차례로 확인하여 최초 달성 전류를 찾습니다. 단일 시험점 W와 시험전류 미확인 Y는 역산을 하지 않습니다.
+온도 곡선은 제공된 경우 `R_T(T)/R_T(25C)`를 추가로 곱하고 전류·온도 분리가능성 근사를 플래그로 표시합니다. 곡선 바깥의 forward 추정은 extrapolation 플래그가 붙습니다. **광도 목표 역산은 곡선의 수집된 점 구간만 탐색**하고 상승 구간을 차례로 확인하여 최초 달성 전류를 찾습니다. 단일 시험점 W와 시험점만 있는 Y는 역산을 하지 않습니다.
 
 저항 역산은 `optical basis → I_target → 동일 DC topology solver → E-series → 실제 선정 저항의 optical` 순으로 진행합니다. `safe`(큰 저항) 반올림이 최소 광도 목표 미달로 이어질 수 있으므로 목표 달성을 재확인합니다.
 

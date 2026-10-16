@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { SOURCES, LEDS, BJTS, DIGITAL, MOSFETS, GPIO, BJT_MODELS, MOSFET_MODELS, modelsForFamily } from '../src/data/catalog.js';
 import { context, sample, ledVoltage, luminousIntensity, gpioVoltage, bjtAt, digitalAt, mosCurrent } from '../src/core/devices.js';
 import { DEFAULT_CONFIG } from '../src/core/topologies.js';
+import { opticalAtCurrent } from '../src/core/optics.js';
 const near = (a, b, t = 1e-8) => assert.ok(Math.abs(a - b) < t, `${a} != ${b}`);
 test('Kingbright electrical/photometric reference points are not mixed with starred convention', () => {
     near(ledVoltage('APT2012SURCK', .02), 1.95);
@@ -16,10 +17,7 @@ test('KT-0805 datasheet links are sourced and absolute limits are no longer synt
         const p = LEDS[id], src = SOURCES[p.source];
         assert.ok(src.manufacturer.includes('KENTO'));
         assert.ok(src.url.startsWith('https://'));
-        if (id !== 'KT-0805Y')
-            assert.ok(Number.isFinite(p.limits.current) && p.limits.current > 0);
-        else
-            assert.equal(p.limits.current, null);
+        assert.ok(Number.isFinite(p.limits.current) && p.limits.current > 0, id);
         assert.ok(Number.isFinite(p.limits.power) && p.limits.power > 0);
         const ctx = context();
         assert.ok(ledVoltage(id, Number.isFinite(p.vfTest.current) ? p.vfTest.current : .01, 25, 0, ctx) > 0);
@@ -27,15 +25,22 @@ test('KT-0805 datasheet links are sourced and absolute limits are no longer synt
     }
     near(LEDS['KT-0805R'].limits.current, .025);
     near(LEDS['KT-0805G'].limits.current, .03);
+    near(LEDS['KT-0805Y'].limits.current, .025);   // Y's own A.0 sheet; no sibling value is borrowed
     near(LEDS['KT-0805W'].limits.power, .08);
 });
 test('KT table-only Y/W models expose midpoint/current-shape assumptions instead of fake curves', () => {
     const y = context();
     near(ledVoltage('KT-0805Y', .01, 25, 0, y), LEDS['KT-0805Y'].vfTableOnly.nominalAssumption);
     assert.ok(y.flags.has('approximation:LED-table-midpoint'));
-    assert.ok(y.flags.has('not-modeled:LED-vf-current-shape'));
-    assert.equal(LEDS['KT-0805Y'].limits.current, null);
-    assert.equal(luminousIntensity('KT-0805Y', .02, 25, context()), null);
+    assert.equal(y.flags.has('not-modeled:LED-vf-current-shape'), false);   // the test current (10 mA) is now known
+    const yAway = context();
+    ledVoltage('KT-0805Y', .02, 25, 0, yAway);
+    assert.ok(yAway.flags.has('extrapolation:LED-table-only-current'));
+    assert.equal(luminousIntensity('KT-0805Y', .02, 25, context()), null);   // a 70–175 mcd range, no invented typ
+    const yo = opticalAtCurrent('KT-0805Y', .02);
+    assert.equal(yo.kind, 'test-point');
+    assert.deepEqual([yo.minMcd, yo.maxMcd], [70, 175]);
+    assert.equal(opticalAtCurrent('KT-0805Y', .01).kind, 'unavailable');   // no current dependence is inferred
 
     const w = LEDS['KT-0805W'], wc = context();
     near(ledVoltage('KT-0805W', w.vfTest.current, 25, 0, wc), w.vfTableOnly.nominalAssumption);
@@ -52,8 +57,7 @@ test('KT min/max intensity ranges are not converted into invented typical mcd', 
     for (const id of ['KT-0805R','KT-0805G','KT-0805B','KT-0805YG','KT-0805Y','KT-0805O']) {
         const ctx = context();
         assert.equal(luminousIntensity(id, Number.isFinite(LEDS[id].optical.testCurrent)?LEDS[id].optical.testCurrent:.01, 25, ctx), null);
-        if(id==='KT-0805Y')assert.ok(ctx.flags.has('not-modeled:LED-absolute-optical-anchor'));
-        else assert.equal(ctx.flags.has('not-modeled:LED-absolute-optical-anchor'),false);
+        assert.equal(ctx.flags.has('not-modeled:LED-absolute-optical-anchor'),false,id);
     }
 });
 test('curve endpoints are preserved and provenance is resolvable', () => {

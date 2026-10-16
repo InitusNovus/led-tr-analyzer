@@ -1,6 +1,6 @@
 /** Optical estimates: keep manufacturer test-point bins separate from typical relative-Iv curves.
  * Source measurements at one IF are not guarantees after scaling to another IF/Ta. */
-import { LEDS } from '../data/catalog.js';
+import { LEDS, ledModel } from '../data/catalog.js';
 import { ModelError, finite, interpolate, bisect } from './math.js';
 
 function sampleRelative(curve, x, ctx, label) {
@@ -9,8 +9,8 @@ function sampleRelative(curve, x, ctx, label) {
     if(p.extrapolated) ctx?.flags?.add('extrapolation:'+label);
     return p;
 }
-export const opticalCapability = ledOrId => {
-    const p=typeof ledOrId==='string'?LEDS[ledOrId]:ledOrId, o=p?.optical;
+export const opticalCapability = (ledOrId,binId=null) => {
+    const p=typeof ledOrId==='string'?ledModel(ledOrId,binId):ledOrId, o=p?.optical;
     if(!o || !Number.isFinite(o.testCurrent) || o.testCurrent<=0) return {kind:'unavailable',reason:'absolute-optical-test-current-unknown',canInvert:false};
     const hasRange=Number.isFinite(o.minMcd)&&Number.isFinite(o.maxMcd);
     const hasTypical=Number.isFinite(o.nominalMcd);
@@ -39,11 +39,11 @@ export function opticalUsageGuide(minMcd,maxMcd=minMcd) {
         label:chosen.length===1?chosen[0].label:chosen[0].label+' ~ '+chosen.at(-1).label,
         note:'실무 감각 참고용입니다. 색·주변 조도·관찰 거리·시야각·확산판·PWM에 따라 체감이 달라집니다. mcd는 체감 밝기 예측값이 아닙니다.'};
 }
-export function opticalAtCurrent(id,current,temperature=25,ctx) {
+export function opticalAtCurrent(id,current,temperature=25,ctx,binId=null) {
     finite(current,'LED current',0);
     finite(temperature,'optical temperature',-100,200);
-    const part=LEDS[id];
-    if(!part) throw new ModelError('invalid-input','Unknown LED: '+id);
+    const part=ledModel(id,binId);
+    if(!part) throw new ModelError('invalid-input',binId?'Unknown LED or intensity bin: '+id+' / '+binId:'Unknown LED: '+id);
     ctx?.sources?.add(part.source);
     const o=part.optical, cap=opticalCapability(part);
     if(cap.kind==='unavailable') {
@@ -108,9 +108,9 @@ export function opticalValueForBasis(result,basis) {
     return null;
 }
 /** Find earliest increasing-branch target solution within characterized relative-Iv domain; no hidden extrapolation. */
-export function solveOpticalCurrent(id,targetMcd,{basis='min',temperature=25}={}) {
+export function solveOpticalCurrent(id,targetMcd,{basis='min',temperature=25,bin=null}={}) {
     finite(targetMcd,'target mcd',Number.MIN_VALUE,1e7);
-    const part=LEDS[id],o=part?.optical,cap=opticalCapability(part);
+    const part=ledModel(id,bin),o=part?.optical,cap=opticalCapability(part);
     if(!o?.relative||!cap.canInvert) throw new ModelError('unsupported','광도 곡선 또는 절대 시험전류가 없어 역산할 수 없습니다.');
     if(basis==='min'&&!cap.hasRange||basis==='typ'&&!cap.hasTypical||
        basis==='representative'&&!cap.hasRange||!['min','typ','representative'].includes(basis))
@@ -118,7 +118,7 @@ export function solveOpticalCurrent(id,targetMcd,{basis='min',temperature=25}={}
     if(temperature!==25&&!o.temperature)throw new ModelError('unsupported','선택 LED의 광학 온도 곡선이 없습니다.');
     const knots=o.relative.points.map(p=>p[0]);
     if(knots.length<2) throw new ModelError('unsupported','광도 곡선 구간이 부족합니다.');
-    const f=i=>opticalValueForBasis(opticalAtCurrent(id,i,temperature),basis)-targetMcd;
+    const f=i=>opticalValueForBasis(opticalAtCurrent(id,i,temperature,undefined,bin),basis)-targetMcd;
     // Check increasing/flat/decreasing sections individually; do not assume the curve is globally monotonic.
     const roots=[];
     for(let j=1;j<knots.length;j++){
@@ -131,7 +131,7 @@ export function solveOpticalCurrent(id,targetMcd,{basis='min',temperature=25}={}
         }
     }
     if(!roots.length) throw new ModelError('out-of-domain','목표 광도가 선택 기준의 광도 곡선 유효 범위에서 달성되지 않습니다.');
-    const current=roots[0],optical=opticalAtCurrent(id,current,temperature);
+    const current=roots[0],optical=opticalAtCurrent(id,current,temperature,undefined,bin);
     return {current,targetMcd,basis,optical,assumptions:[...optical.assumptions,
         ...(basis==='representative'?['midpoint is user-selected representative assumption, not datasheet typ']:[])],
         domain:o.relative.domain,validity:'typical-curve-based-estimate-not-guaranteed'};
