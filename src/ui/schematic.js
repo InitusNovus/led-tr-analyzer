@@ -10,7 +10,7 @@ import { LEDS, getDeviceModel } from '../data/catalog.js';
 export const VIEW = Object.freeze({ w: 720, h: 440 });
 const LEAD = 34;            // pin distance from the centre of a vertical two-terminal part
 const TR = 42;              // pin distance from the centre of a BJT/MOSFET
-const FONT = { 'part-label': 14, 'terminal-label': 13, 'minor-label': 13, 'rail-label': 14 };
+const FONT = { 'part-label': 14, 'terminal-label': 13, 'minor-label': 13, 'rail-label': 14, 'note-label': 13 };
 
 export const textWidth = (text, size) => [...String(text)].reduce((w, ch) => w + (ch.codePointAt(0) >= 0x1100 ? size : size * 0.6), 0);
 
@@ -81,11 +81,11 @@ function dtc(id, x, y, { name }) {
     label(p, 'IN', -114, -9, { cls: 'terminal-label', anchor: 'end' });
     return p;
 }
-function gpio(x, y, { model, state, notes = 'below' }) {
+function gpio(x, y, { model, state, value, notes = 'below' }) {
     const p = make('gpio', 'GPIO1', x, y);
     for (const [n, dx, dy] of [['r', 45, 0], ['l', -45, 0], ['t', 0, -19], ['b', 0, 19]]) pin(p, n, dx, dy, 'GPIO1.PIN');
     box(p, -45, -19, 90, 38); label(p, 'GPIO1', 0, 5, { anchor: 'middle' });
-    const sub = [model, state].filter(Boolean);
+    const sub = [model, state, value].filter(Boolean);
     if (notes === 'left') sub.forEach((t, i) => label(p, t, -52, 0 + i * 17 - (sub.length - 1) * 8, { anchor: 'end', cls: 'minor-label' }));
     else {   // left-aligned at the canvas margin so a long model name never runs off the edge
         const first = notes === 'below' ? 36 : -38 - (sub.length - 1) * 17;
@@ -111,11 +111,25 @@ class Scene {
     /** Polyline through the given points; the first and last must be pins (or points on another wire). */
     wire(net, ...pts) { this.wires.push({ net, points: pts.map(p => [p[0], p[1]]) }); }
 }
-export function buildScene(config, point) {
+/**
+ * level: 'off' (default) | 'core' (rail, GPIO, RLED, LED) | 'all' (adds the bias/gate resistors and the transistors).
+ * The notes are the nominal operating point of the current configuration, never a sampled extreme.
+ */
+export function buildScene(config, point, { level = 'off' } = {}) {
+    const scene = build(config, point, level);
+    return level !== 'off' && point ? annotate(scene, config, point, level) : scene;
+}
+const sig = (v, d = 3) => Number.isFinite(v) ? Number(v.toPrecision(d)).toString() : '—';
+const mA = a => sig(a * 1000) + ' mA', volt = v => sig(v) + ' V', voltShort = v => v < 0.1 ? sig(v * 1000) + ' mV' : volt(v);
+const approxGpio = config => /approx/.test(getDeviceModel(config.deviceModels?.GPIO1)?.modelKind ?? '');
+function gpioNote(config, point) {
+    return config.deviceModels?.GPIO1 && point ? `${approxGpio(config) ? '≈ ' : ''}핀 ${volt(point.gpioVoltage)} · ${mA(point.gpioCurrent)}` : null;
+}
+function build(config, point, level) {
     const s = new Scene(), led1 = LEDS[config.led], id = config.topology, resistance = point?.config.resistance ?? config.resistance;
     const model = i => getDeviceModel(config.deviceModels?.[i])?.id ?? i;
     const stateText = config.deviceModels?.GPIO1 ? `요청 ${config.state} · 유효 ${point?.effectiveGpioState ?? '—'}` : null;
-    const gpioPart = (x, y, notes) => s.add(gpio(x, y, { model: model('GPIO1'), state: stateText, notes }));
+    const gpioPart = (x, y, notes) => s.add(gpio(x, y, { model: model('GPIO1'), state: stateText, value: level === 'off' ? null : gpioNote(config, point), notes }));
     const RLED = (x, y) => s.add(resV('RLED', x, y, { value: resistance, name: 'RLED' }));
     const LED = (x, y) => s.add(led(x, y, { color: led1.color, name: led1.id }));
     const X = 470, RAIL_Y = 44;
@@ -224,6 +238,47 @@ function compound(s, config, point, { model, gpioPart, RLED, LED, id }) {
         s.wire('drive', at(rgs, 'b'), [Q1X, rgs.pins.b.y]);
     }
     return finish(s, id);
+}
+
+function retext(p, i, text) {
+    const old = p.labels[i], size = FONT[old.cls], width = textWidth(text, size);
+    const left = old.anchor === 'middle' ? old.x - width / 2 : old.anchor === 'end' ? old.x - width : old.x;
+    p.labels[i] = { ...old, text, rect: { x: left, y: old.y - size * 0.8, w: width, h: size * 1.05 } };
+}
+const overlapRects = (p, q, eps = 0.5) => p.x < q.x + q.w - eps && q.x < p.x + p.w - eps && p.y < q.y + q.h - eps && q.y < p.y + p.h - eps;
+const segmentHits = ({ a, b }, r, eps = 1) => {
+    const x1 = Math.min(a[0], b[0]), x2 = Math.max(a[0], b[0]), y1 = Math.min(a[1], b[1]), y2 = Math.max(a[1], b[1]);
+    return x2 > r.x + eps && x1 < r.x + r.w - eps && y2 > r.y + eps && y1 < r.y + r.h - eps;
+};
+/**
+ * One extra line in the same column and alignment as a part's main label. It tries the line below, above, and two lines
+ * away, and keeps the first position that is inside the canvas and clear of every wire, part and label; with no free
+ * position the note is left out rather than drawn over something.
+ */
+function noteLine(scene, p, text, extra = []) {
+    const main = p.labels[0], segs = wireSegments(scene), size = FONT['note-label'], width = textWidth(text, size) * 1.08 + 2;   // a little slack: real glyphs are slightly wider than the estimate
+    const left = dx => main.anchor === 'middle' ? p.x + dx - width / 2 : main.anchor === 'end' ? p.x + dx - width : p.x + dx;
+    for (const dy of [main.y - p.y + 17, main.y - p.y - 17, main.y - p.y + 34, main.y - p.y - 34, 24, 36, ...extra]) {
+        const rect = { x: left(main.x - p.x), y: p.y + dy - size * 0.9, w: width, h: size * 1.3 };
+        const free = rect.x >= 4 && rect.y >= 4 && rect.x + rect.w <= VIEW.w - 4 && rect.y + rect.h <= VIEW.h - 4
+            && !segs.some(sg => segmentHits(sg, rect))
+            && !scene.parts.some(q => q.boxes.some(bx => overlapRects(rect, bx)) || q.labels.some(l => overlapRects(rect, l.rect)));
+        if (free) { label(p, text, main.x - p.x, dy, { anchor: main.anchor, cls: 'note-label' }); return; }
+    }
+}
+function annotate(scene, config, point, level) {
+    const entry = id => point.ledger.find(e => e.id === id || e.instanceId === id);
+    const iv = e => e ? `${mA(e.current)} · ${voltShort(Math.abs(e.voltage))}` : null;
+    for (const p of scene.parts) {
+        if (p.kind === 'rail') retext(p, 0, `VLED ${volt(config.vcc)}`);
+        else if (p.kind === 'led') { const e = entry('LED1'); if (e) noteLine(scene, p, `${mA(e.current)} · ${voltShort(point.ledVf)}${config.seriesCount > 1 ? ' ×' + config.seriesCount : ''}`); }
+        else if (p.id === 'RLED') { const t = iv(entry('RLED')); if (t) noteLine(scene, p, t); }
+        else if (level === 'all' && (p.kind === 'resV' || p.kind === 'resH')) { const t = iv(entry(p.id)); if (t) noteLine(scene, p, t); }
+        else if (level === 'all' && (p.kind === 'bjt' || p.kind === 'mos' || p.kind === 'dtc')) {
+            const t = iv(entry(p.kind === 'dtc' ? 'Q1.die' : p.id)); if (t) noteLine(scene, p, t);
+        }
+    }
+    return scene;
 }
 
 function finish(s, id) { return { topology: id, view: VIEW, parts: s.parts, wires: s.wires }; }

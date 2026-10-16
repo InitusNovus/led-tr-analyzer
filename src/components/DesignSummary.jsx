@@ -13,7 +13,7 @@ function OpticalResult({optical}){
  return <div className="design-optical"><div><strong>광도 추정</strong><b>{value}</b></div>
   <small>{range?'원문 광도 bin × 상대 광도 곡선. 다른 전류에서 min/max 보증값이 아닙니다.':
     optical.kind==='test-point'?'원문 단일 시험점 전용':'typ 곡선 기반 또는 미지원 조건'}</small>
-  {optical.usageGuide&&<p className="mcd-guide" data-testid="mcd-guide"><span aria-hidden="true">ⓘ</span> <strong className="mcd-guide-label">{optical.usageGuide.label}</strong> — {optical.usageGuide.note}</p>}
+  {optical.usageGuide&&<p className="mcd-guide" data-testid="mcd-guide" role="note"><span aria-hidden="true">ⓘ</span> <strong className="mcd-guide-label">{optical.usageGuide.label}</strong> — {optical.usageGuide.note}</p>}
   {optical.kind==='unavailable'&&<small>사유: {optical.reason}</small>}
  </div>;
 }

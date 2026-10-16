@@ -4,11 +4,11 @@ import { freshConfig, transitionConfig, solvePoint, TOPOLOGIES } from '../src/co
 import { buildScene, drawnNets, junctions, wireSegments, VIEW } from '../src/ui/schematic.js';
 import { CIRCUIT_TEMPLATES } from '../src/ui/circuitTemplates.js';
 
-const sceneFor = (id, extra = {}) => {
+const sceneFor = (id, extra = {}, opts = {}) => {
     const config = { ...transitionConfig(freshConfig(), id), ...extra };
     let point = null;
     try { point = solvePoint(config); } catch { /* an unsupported state still has to draw */ }
-    return buildScene(config, point);
+    return buildScene(config, point, opts);
 };
 const SCENES = Object.fromEntries(TOPOLOGIES.map(t => [t.id, sceneFor(t.id)]));
 const nets = list => list.map(n => [...n].sort().join('|')).sort();
@@ -98,8 +98,9 @@ test('wires do not cut through another part, and parts do not overlap', () => {
     }
 });
 
-test('text stays inside the canvas and never sits on a wire or another part or label', () => {
-    for (const [id, scene] of Object.entries(SCENES)) {
+const OVERLAY = Object.fromEntries(['core', 'all'].flatMap(level => TOPOLOGIES.map(t => [`${t.id}+${level}`, sceneFor(t.id, {}, { level })])));
+test('text stays inside the canvas and never sits on a wire or another part or label (also with value notes)', () => {
+    for (const [id, scene] of [...Object.entries(SCENES), ...Object.entries(OVERLAY)]) {
         const segs = wireSegments(scene), labels = scene.parts.flatMap(p => p.labels.map(l => ({ ...l, owner: p.id })));
         for (const l of labels) {
             const r = l.rect;
