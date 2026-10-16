@@ -44,12 +44,15 @@ export function quickSpecs(part) {
       const v=[vf.min!=null?fmt(vf.min,1,'V'):null,vf.typ!=null?fmt(vf.typ,1,'V'):null,vf.max!=null?fmt(vf.max,1,'V'):null].filter(Boolean).join(' / ');
       if(v)xs.push({label:'Vf min / typ / max',value:v,condition:fmt(vf.current,1000,'mA')+' · '+(vf.condition??'')});
     }
-    const o=part.optical;
+    const binList=rows=>rows.map(b=>b.id+' '+b.min+'–'+b.max).join(' · '),o=part.optical;
     if(o) {
       const range=Number.isFinite(o.minMcd)&&Number.isFinite(o.maxMcd)?fmt(o.minMcd,1,'mcd')+' … '+fmt(o.maxMcd,1,'mcd'):
         Number.isFinite(o.nominalMcd)?fmt(o.nominalMcd,1,'mcd')+' typ':null;
-      if(range)xs.push({label:'광도 anchor',value:range,condition:Number.isFinite(o.testCurrent)?fmt(o.testCurrent,1000,'mA'):'시험전류 미확인'});
+      if(range)xs.push({label:o.selectedBin?'광도 bin '+o.selectedBin:'광도 anchor',value:range,condition:(Number.isFinite(o.testCurrent)?fmt(o.testCurrent,1000,'mA'):'시험전류 미확인')+(o.selectedBin?' · 선택한 등급 범위':'')});
+      if(o.intensityBins?.length)xs.push({label:'광도 bin (P코드)',value:binList(o.intensityBins)+' mcd',condition:'IF '+fmt(o.testCurrent,1000,'mA')+' · p.4 §6.1 · 허용차 ±10%'});
     }
+    if(part.bins?.voltage)xs.push({label:'전압 bin (V코드)',value:binList(part.bins.voltage.rows)+' V',condition:'IF '+fmt(part.bins.voltage.current,1000,'mA')+' · '+part.bins.voltage.source+' · '+part.bins.voltage.tolerance});
+    if(part.bins?.wavelength)xs.push({label:'파장 bin (품번 끝 숫자와 같은 코드)',value:binList(part.bins.wavelength.rows)+' nm',condition:'IF '+fmt(part.bins.wavelength.current,1000,'mA')+' · '+part.bins.wavelength.source+' · '+part.bins.wavelength.tolerance});
   }
   if(part.modelKind==='user-assumed-thevenin')xs.push({label:'제어원 모델',value:'이상적 DC + 설정한 출력저항',condition:'실제 전류 한계·보호·역급전 미모델링'});
   if(part.r1)put('내장 R1',part.r1,1,'Ω');
@@ -81,7 +84,10 @@ export function buildInstanceViews(config,point,validation) {
     if(point.optical?.kind==='range')metric('LED1','광도 min',point.optical.minMcd,1,'mcd'),
         metric('LED1','광도 max',point.optical.maxMcd,1,'mcd');
     if(point.optical?.nominalMcd!=null)metric('LED1','광도 typ',point.optical.nominalMcd,1,'mcd');
-    metric('RLED','저항',config.resistance,1,'Ω');metric('RLED','전력',point.resistorPower,1000,'mW');
+    const rled=point.ledger.find(e=>(e.instanceId??e.id)==='RLED');
+    metric('RLED','저항',config.resistance,1,'Ω');
+    if(rled){metric('RLED','전류',rled.current,1000,'mA');metric('RLED','전압강하',rled.voltage,1,'V');}
+    metric('RLED','전력',point.resistorPower,1000,'mW');
     if(config.deviceModels?.GPIO1){
       metric('GPIO1','핀 전류 (+source)',point.gpioCurrent,1000,'mA');
       metric('GPIO1','단자 전압',point.gpioVoltage,1,'V');
@@ -91,7 +97,9 @@ export function buildInstanceViews(config,point,validation) {
       v.modelId=q.modelId;v.part=getDeviceModel(q.modelId);
       metric(id,'전류',q.current,1000,'mA');
       metric(id,'전압강하',q.voltage,1,'V');
-      metric(id,'손실',q.power,1000,'mW');
+      const die=point.ledger.find(e=>e.id===id+'.die');   // digital transistor: the package loss is the die plus its built-in R1/R2
+      if(die){metric(id,'패키지 손실',q.power,1000,'mW');metric(id,'다이 손실',die.power,1000,'mW');}
+      else metric(id,'손실',q.power,1000,'mW');
       if(q.base!=null)metric(id,'IB',q.base,1000,'mA');
       if(q.emitter!=null)metric(id,'IE',q.emitter,1000,'mA');
       if(q.gate!=null)metric(id,'|VGS|',Math.abs(q.gate),1,'V');

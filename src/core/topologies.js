@@ -1,7 +1,7 @@
 import { ModelError, finite, bisect } from './math.js';
 import { context, ledVoltage, gpioVoltage, gpioState, gpioModel, driveHigh, driveLow, bjtAt, digitalAt, mosCurrent } from './devices.js';
 import { opticalAtCurrent } from './optics.js';
-import { LEDS, DEFAULT_MODEL_BY_FAMILY, getDeviceModel } from '../data/catalog.js';
+import { LEDS, ledModel, DEFAULT_MODEL_BY_FAMILY, getDeviceModel } from '../data/catalog.js';
 
 const slot = (id, family, role) => ({ id, family, role, defaultModelId: DEFAULT_MODEL_BY_FAMILY[family] });
 export const TOPOLOGIES = [
@@ -54,7 +54,7 @@ const DEFAULT_DEVICE_MODELS=Object.freeze({
     GPIO1: DEFAULT_MODEL_BY_FAMILY.gpio,
 });
 export const DEFAULT_CONFIG = Object.freeze({
-    topology:'digital-npn', led:'APT2012SURCK', deviceModels:DEFAULT_DEVICE_MODELS, vcc:5, vdd:3.3, resistance:330,
+    topology:'digital-npn', led:'APT2012SURCK', ledBin:null, deviceModels:DEFAULT_DEVICE_MODELS, vcc:5, vdd:3.3, resistance:330,
     baseResistance:4700, emitterResistance:220, gateResistance:1000, pullResistance:40000, gatePull:100000, sourceResistance:0,
     state:'HIGH', gpioMode:'push-pull', pull:'none', temperature:25, ambient:25, seriesCount:1,
     vfShift:0, dtcR1Scale:1, dtcRatio:10, vccTolerance:5, vddTolerance:3, resistorTolerance:1, vfSpread:.1,
@@ -85,6 +85,9 @@ export function normalizeConfig(input={}) {
     const topology=topologyById(raw.topology);
     if(!topology || !LEDS[raw.led])
         throw new ModelError('invalid-input','회로/LED 선택이 유효하지 않습니다.');
+    if(raw.ledBin!=null && raw.ledBin!=='' && !ledModel(raw.led,raw.ledBin))
+        throw new ModelError('invalid-input','선택한 LED에 없는 광도 등급(bin)입니다: '+raw.ledBin);
+    raw.ledBin=raw.ledBin===''?null:(raw.ledBin??null);
     const active=activeParameterNames(topology,raw);
     const c={...raw, deviceModels:resolveDeviceModels(raw.deviceModels,topology)};
     for(const key of Object.keys(numericRules)) {
@@ -139,7 +142,7 @@ function finalize(r){
     const {config:c,ctx}=r;
     r.ledVf=ledVoltage(c.led,r.current,c.temperature,c.vfShift,ctx);
     r.loadVoltage=r.ledVf*c.seriesCount+r.current*c.resistance;
-    r.optical=opticalAtCurrent(c.led,r.current,c.temperature,ctx);
+    r.optical=opticalAtCurrent(c.led,r.current,c.temperature,ctx,c.ledBin);
     r.luminousMcd=r.optical.nominalMcd;
     r.ledger.unshift(resistor('RLED',r.current,c.resistance),{...power('LED1',r.current,r.ledVf*c.seriesCount,'led'),count:c.seriesCount});
     r.resistorPower=r.current*r.current*c.resistance;

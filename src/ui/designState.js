@@ -1,5 +1,5 @@
 import { freshConfig, transitionConfig, topologyById } from '../core/topologies.js';
-import { LEDS } from '../data/catalog.js';
+import { LEDS, ledModel } from '../data/catalog.js';
 import { opticalCapability } from '../core/optics.js';
 import { DEFAULT_GOAL_TOLERANCE_PCT } from '../core/goal.js';
 import { DEFAULT_MARGIN_PCT } from '../core/warnings.js';
@@ -44,11 +44,17 @@ export function designReducer(state, action) {
         case 'led': {
             const cap = opticalCapability(LEDS[action.id]);
             const fallback = state.targetKind === 'mcd' && !cap.canInvert;
-            return withConfig(state, { ...state.config, led: action.id }, {
+            return withConfig(state, { ...state.config, led: action.id, ledBin: null }, {
                 selectedInstance: 'LED1', opticalBasis: cap.hasRange ? 'min' : 'typ',
                 targetKind: fallback ? 'current' : state.targetKind,
                 opticalNotice: fallback ? '선택 LED에 광도 역산 근거가 없어 전류 목표로 돌아왔습니다. 이전 mcd 입력값은 보존했습니다.' : '',
             });
+        }
+        case 'ledBin': {
+            // A bin only narrows the optical range of the selected LED; an unknown bin is ignored rather than stored.
+            const bin = action.bin || null;
+            if (bin && !ledModel(state.config.led, bin)) return state;
+            return withConfig(state, { ...state.config, ledBin: bin }, { selectedInstance: 'LED1' });
         }
         case 'targetKind':
             if (action.kind === 'mcd' && !opticalCapability(LEDS[state.config.led]).canInvert) return state;

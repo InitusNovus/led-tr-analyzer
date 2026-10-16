@@ -28,6 +28,8 @@ function HitArea({ boxes, pad = 8 }) {
     const x2 = Math.max(...boxes.map(b => b.x + b.w)) + pad, y2 = Math.max(...boxes.map(b => b.y + b.h)) + pad;
     return <rect className="hit-area" x={x1} y={y1} width={x2 - x1} height={y2 - y1} />;
 }
+/** Pointer target of a part: its symbol and its captions, so a click on the name selects it too. */
+const hitBoxes = p => [...p.boxes, ...p.labels.map(l => l.rect)];
 const Labels = ({ p }) => p.labels.map((t, i) => <text key={i} className={t.cls} x={t.x} y={t.y} textAnchor={t.anchor}>{t.text}</text>);
 const Leads = ({ d, on }) => <path className={cls('wire', on && 'energized')} d={d} />;
 
@@ -90,19 +92,20 @@ function Part({ p, loadOn, driveOn, point, selected, onSelect, names }) {
     switch (p.kind) {
         case 'rail': return <><Rail p={p} /><Labels p={p} /></>;
         case 'ground': return <><Ground p={p} /><Labels p={p} /></>;
-        case 'resV': return <Hit id={p.id} label={p.id} {...common}><HitArea boxes={p.boxes} /><ResV p={p} /><Labels p={p} /></Hit>;
-        case 'resH': return <Hit id={p.id} label={p.id} {...common}><HitArea boxes={p.boxes} /><ResH p={p} on={on} /><Labels p={p} /></Hit>;
-        case 'led': return <Hit id={p.id} label={names.led} {...common}><HitArea boxes={p.boxes} /><Led p={p} on={loadOn} currentA={point?.current} /><Labels p={p} /></Hit>;
-        case 'bjt': return <Hit id={p.id} label={p.id} {...common}><HitArea boxes={p.boxes} pad={4} /><BjtShape p={p} /><Labels p={p} /></Hit>;
-        case 'mos': return <Hit id={p.id} label={p.id} {...common}><HitArea boxes={p.boxes} pad={4} /><MosShape p={p} /><Labels p={p} /></Hit>;
-        case 'gpio': return <Hit id={p.id} label={names.gpio} {...common}><HitArea boxes={p.boxes} pad={4} /><Gpio p={p} /><Labels p={p} /></Hit>;
+        case 'resV': return <Hit id={p.id} label={p.id} {...common}><HitArea boxes={hitBoxes(p)} /><ResV p={p} /><Labels p={p} /></Hit>;
+        case 'resH': return <Hit id={p.id} label={p.id} {...common}><HitArea boxes={hitBoxes(p)} /><ResH p={p} on={on} /><Labels p={p} /></Hit>;
+        case 'led': return <Hit id={p.id} label={names.led} {...common}><HitArea boxes={hitBoxes(p)} /><Led p={p} on={loadOn} currentA={point?.current} /><Labels p={p} /></Hit>;
+        case 'bjt': return <Hit id={p.id} label={p.id} {...common}><HitArea boxes={hitBoxes(p)} pad={4} /><BjtShape p={p} /><Labels p={p} /></Hit>;
+        case 'mos': return <Hit id={p.id} label={p.id} {...common}><HitArea boxes={hitBoxes(p)} pad={4} /><MosShape p={p} /><Labels p={p} /></Hit>;
+        case 'gpio': return <Hit id={p.id} label={names.gpio} {...common}><HitArea boxes={hitBoxes(p)} pad={4} /><Gpio p={p} /><Labels p={p} /></Hit>;
         case 'dtc': {
             const { x, y } = p, r1 = { x: x - 71, y, x1: x - 96, x2: x - 48, width: 26 }, label = (t) => p.labels.filter(l => l.text === t);
             const own = p.labels.filter(l => !['R1', 'R2', 'IN'].includes(l.text));
             return <>
                 <Hit id={p.id} label={p.id} {...common}>
                     <rect className="package-outline" x={p.outline.x} y={p.outline.y} width={p.outline.w} height={p.outline.h} rx={p.outline.r} />
-                    <HitArea boxes={p.boxes.slice(0, 1)} pad={4} />
+                    {/* the whole package and its caption select Q1; R1 and R2 are separate parts drawn above this */}
+                    <HitArea boxes={[{ x: p.outline.x, y: p.outline.y, w: p.outline.w, h: p.outline.h }, ...own.map(t => t.rect)]} pad={4} />
                     <BjtShape p={{ ...p, polarity: 'npn' }} />
                     {own.map((t, i) => <text key={i} className={t.cls} x={t.x} y={t.y} textAnchor={t.anchor}>{t.text}</text>)}
                 </Hit>

@@ -35,5 +35,6 @@ test('explore scales separate the slider range from datasheet numbers', () => {
     assert.equal(kt.testCurrent, 0.02);
     assert.match(kt.note, /보증이 아님/);
     assert.deepEqual(exploreScale('mcd', LEDS['APT2012SURCK']).datasheet, { typ: 230 });
-    assert.equal(exploreScale('mcd', LEDS['KT-0805Y']).datasheet?.min, undefined);
+    assert.deepEqual(exploreScale('mcd', LEDS['KT-0805Y']).datasheet, { min: 70, max: 175 });
+    assert.equal(exploreScale('mcd', LEDS['KT-0805Y']).testCurrent, 0.02);
 });

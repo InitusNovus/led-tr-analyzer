@@ -47,7 +47,7 @@ export function intentFromGoal(goal, { series, strategy }) {
 }
 
 const DRIFT_FIELDS = [
-    ['topology', '토폴로지', ''], ['led', 'LED', ''], ['seriesCount', '직렬 LED', '개'], ['temperature', '전기 모델 온도', '°C'],
+    ['topology', '토폴로지', ''], ['led', 'LED', ''], ['ledBin', 'LED 광도 등급', ''], ['seriesCount', '직렬 LED', '개'], ['temperature', '전기 모델 온도', '°C'],
     ['vcc', 'VLED', 'V'], ['vdd', 'GPIO 전원', 'V'], ['resistance', 'RLED', 'Ω'], ['baseResistance', 'RB', 'Ω'],
     ['emitterResistance', 'RE', 'Ω'], ['gateResistance', 'RG', 'Ω'], ['gatePull', 'RGS', 'Ω'], ['pullResistance', 'GPIO pull', 'Ω'],
     ['sourceResistance', '제어원 Rout', 'Ω'], ['state', '출력 상태', ''], ['gpioMode', '출력 모드', ''], ['pull', 'Hi-Z pull', ''],
