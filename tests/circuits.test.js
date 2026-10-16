@@ -187,7 +187,7 @@ test('inactive hidden numeric drafts do not block another topology, and transiti
     assert.equal(analyzePoint(back).error.code,'invalid-input');
 });
 test('KT curve LEDs keep 25C electrical curve at unsupported temperature instead of crashing', () => {
-    for(const led of ['KT-0805R','KT-0805G','KT-0805B','KT-0805YG','KT-0805O']){
+    for(const led of ['KT-0805R','KT-0805G','KT-0805B','KT-0805YG','KT-0805Y','KT-0805O']){
         const a=analyzePoint({...DEFAULT_CONFIG,led,temperature:50});
         assert.ok(a.ok,led+': '+JSON.stringify(a.error));
         assert.ok(a.point.flags.includes('not-modeled:LED-temperature'));
