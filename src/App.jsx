@@ -12,6 +12,7 @@ import DesignSummary from './components/DesignSummary.jsx';
 import ResultStrip from './components/ResultStrip.jsx';
 import{SensitivityWitness}from'./components/SensitivitySummary.jsx';
 import QuickSpecs from './components/QuickSpecs.jsx';
+import Help from './components/Help.jsx';
 import { opticalCapability } from './core/optics.js';
 import { flagText } from './core/flags.js';
 import { sortedPresets } from './core/warnings.js';
@@ -44,7 +45,7 @@ function Inspector({view}){
  return <div className="inspector" data-inspector-id={view.instanceId}>
   <div className="inspector-title"><div><strong>{view.instanceId}</strong><span>{view.part?.name??view.label}</span></div>{view.region&&<em>{view.region}</em>}</div>
   {view.metrics.length?<div className="inspector-metrics">{view.metrics.map((m,i)=><span key={m.label+i}><small>{m.label}</small><b>{m.display}</b></span>)}</div>:
-   <p className="subtle">이 소자의 동작점은 아직 계산되지 않았거나 현재 구조에서 수치가 없습니다. 정적 부품 정보는 유지됩니다.</p>}
+   <small className="subtle">동작점 수치 없음<Help label="설명">이 소자의 동작점은 아직 계산되지 않았거나 현재 구조에서 수치가 없습니다. 정적 부품 정보는 유지됩니다.</Help></small>}
   {view.checks?.length>0&&<div className="instance-checks"><strong>이 소자의 정격 검사</strong>{view.checks.map((c,i)=><div key={c.ruleId+i}>
      <span>{c.id} · {c.status}</span>
      <small>{show(c.actual,c.unit==='A'||c.unit==='W'?1000:1,c.unit==='A'?'mA':c.unit==='W'?'mW':c.unit)} / {show(c.limit,c.unit==='A'||c.unit==='W'?1000:1,c.unit==='A'?'mA':c.unit==='W'?'mW':c.unit)}</small>
@@ -131,17 +132,16 @@ export default function App(){
   <section className="workbench">
    <div className="setup-column">
    <div className="panel setup-panel"><h2>회로와 실제 부품</h2>
-    <label className="field" htmlFor="topology"><span>토폴로지</span><select id="topology" value={config.topology} onChange={e=>changeTopology(e.target.value)}>{TOPOLOGIES.map(x=><option key={x.id} value={x.id}>{x.family} · {x.name}</option>)}</select></label>
-    <p className="subtle">{t.path}<br/>토폴로지 전환 시 기본 ON 상태({t.active})로 설정됩니다.</p>
+    <label className="field" htmlFor="topology"><span>토폴로지<Help label="토폴로지 설명">{t.path}<br/>토폴로지 전환 시 기본 ON 상태({t.active})로 설정됩니다.</Help></span><select id="topology" value={config.topology} onChange={e=>changeTopology(e.target.value)}>{TOPOLOGIES.map(x=><option key={x.id} value={x.id}>{x.family} · {x.name}</option>)}</select></label>
     <details className="topology-gallery"><summary>지원 회로 13종 보기</summary><div className="topology-cards">{TOPOLOGIES.map(x=><button key={x.id} className={cls(config.topology===x.id&&'active')} onClick={()=>changeTopology(x.id)}><b>{x.name}</b><small>{x.path}</small></button>)}</div></details>
     <label className="field" htmlFor="led"><span>LED1</span><select id="led" value={config.led} onChange={e=>changeLed(e.target.value)}>{Object.values(LEDS).map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
     {ledBins.length>0&&<div className="led-bin" data-testid="led-bin">
-      <label className="field" htmlFor="led-bin"><span>광도 등급 (bin)<small>선택 안 하면 전체 범위</small></span>
+      <label className="field" htmlFor="led-bin"><span>광도 등급 (bin)<Help label="광도 등급 설명" className="led-bin-help" testid="led-bin-help">데이터시트의 광도 bin은 P코드(P19 …)입니다. 품번 끝의 R1–R5 같은 코드는 같은 데이터시트에서 <b>파장 bin</b>이며 밝기와는 별개입니다. 등급을 고르면 광도 범위와 목표 역산이 그 범위로 좁아지고, 고르지 않으면 지금처럼 전체 bin 범위를 씁니다. 등급은 보증값이 아니라 제조사 분류 범위입니다.</Help><small>선택 안 하면 전체 범위</small></span>
        <select id="led-bin" value={config.ledBin??''} onChange={e=>changeLedBin(e.target.value)}>
         <option value="">미지정 · 전체 {ledModel(config.led).optical.minMcd}–{ledModel(config.led).optical.maxMcd} mcd</option>
         {ledBins.map(b=><option key={b.id} value={b.id}>{b.id} · {b.min}–{b.max} mcd @ {ledModel(config.led).optical.testCurrent*1000} mA</option>)}
        </select></label>
-      <small className="subtle led-bin-help">데이터시트의 광도 bin은 P코드(P19 …)입니다. 품번 끝의 R1–R5 같은 코드는 같은 데이터시트에서 <b>파장 bin</b>이며 밝기와는 별개입니다. 등급을 고르면 광도 범위와 목표 역산이 그 범위로 좁아지고, 고르지 않으면 지금처럼 전체 bin 범위를 씁니다. 등급은 보증값이 아니라 제조사 분류 범위입니다.</small>
+      
     </div>}
     <div className="part-meta"><span>{led.kind}</span><span>{optical.label}</span></div><QuickSpecs part={led} heading="LED 시험조건·광도 범위"/>
     <div className="supply-grid">{number('vcc','VLED / collector rail','V')}{topologyUsesGPIO(t)&&number('vdd',config.deviceModels?.GPIO1==='assumed:DC-Thevenin'?'제어원 HIGH 전압':'GPIO 전원','V')}{number('seriesCount','직렬 LED','개',1)}{number('temperature','전기 모델 온도','°C')}</div>
@@ -188,7 +188,7 @@ export default function App(){
          <input id="target-slider" type="range" min="0.5" max="25" step="0.5"
            value={typeof targetMa==='number'?Math.max(.5,Math.min(25,targetMa)):10}
            onChange={e=>{setTargetMa(Number(e.target.value));setCornerSnapshot(null);}}/>
-       <small className="explore-scale" data-testid="explore-scale">{scaleCurrent.note} · LED {scaleCurrent.rated!=null?'정격 최대 '+show(scaleCurrent.rated,1000,'mA'):'정격 최대 미확인'}</small>
+       <Help label="눈금 설명" className="explore-scale" testid="explore-scale">{scaleCurrent.note} · LED {scaleCurrent.rated!=null?'정격 최대 '+show(scaleCurrent.rated,1000,'mA'):'정격 최대 미확인'}</Help>
        </div>}
        {targetKind==='mcd'&&<div className="target-explore">
          <label htmlFor="optical-slider">광도 탐색용 눈금 · 유효범위는 실제 곡선으로 검사</label>
@@ -196,16 +196,16 @@ export default function App(){
            max={Math.max(20,Math.min(2000,Math.round(1.5*(led.optical?.maxMcd??led.optical?.nominalMcd??200))))}
            value={typeof targetMcd==='number'?Math.max(1,Math.min(Math.max(20,Math.min(2000,Math.round(1.5*(led.optical?.maxMcd??led.optical?.nominalMcd??200)))),targetMcd)):60}
            onChange={e=>{setTargetMcd(Number(e.target.value));setCornerSnapshot(null);}}/>
-       <small className="explore-scale" data-testid="explore-scale">눈금 {scaleMcd.range} — {scaleMcd.note}
-        {scaleMcd.datasheet?.min!=null?' · 제조사 원문 '+show(scaleMcd.datasheet.min,1,'')+'–'+show(scaleMcd.datasheet.max,1,'mcd')+' bin'+(scaleMcd.testCurrent!=null?' @ '+show(scaleMcd.testCurrent,1000,'mA'):''):scaleMcd.datasheet?.typ!=null?' · 제조사 원문 '+show(scaleMcd.datasheet.typ,1,'mcd')+' typ'+(scaleMcd.testCurrent!=null?' @ '+show(scaleMcd.testCurrent,1000,'mA'):''):' · 제조사 광도 anchor 없음'}</small>
+       <Help label="눈금 설명" className="explore-scale" testid="explore-scale">눈금 {scaleMcd.range} — {scaleMcd.note}
+        {scaleMcd.datasheet?.min!=null?' · 제조사 원문 '+show(scaleMcd.datasheet.min,1,'')+'–'+show(scaleMcd.datasheet.max,1,'mcd')+' bin'+(scaleMcd.testCurrent!=null?' @ '+show(scaleMcd.testCurrent,1000,'mA'):''):scaleMcd.datasheet?.typ!=null?' · 제조사 원문 '+show(scaleMcd.datasheet.typ,1,'mcd')+' typ'+(scaleMcd.testCurrent!=null?' @ '+show(scaleMcd.testCurrent,1000,'mA'):''):' · 제조사 광도 anchor 없음'}</Help>
        </div>}
-       {targetKind==='mcd'&&<><label className="field" htmlFor="optical-basis"><span>광도 역산 기준</span>
+       {targetKind==='mcd'&&<><label className="field" htmlFor="optical-basis"><span>광도 역산 기준<Help label="광도 추정 설명">광도는 선택 시험점과 전형적 상대곡선 기반 추정입니다. 선정 저항으로 목표 달성을 다시 검사합니다.</Help></span>
          <select id="optical-basis" value={opticalBasis} onChange={e=>{setOpticalBasis(e.target.value);setCornerSnapshot(null);}}>
           {opticalCap.hasRange&&<option value="min">최저 bin 기준 추정 (보증 아님)</option>}
           {opticalCap.hasTypical&&<option value="typ">제조사 typ anchor 기준</option>}
           {opticalCap.hasRange&&<option value="representative">중간 대표값 가정 (typ 아님)</option>}
          </select></label>
-         <p className="subtle">광도는 선택 시험점과 전형적 상대곡선 기반 추정입니다. 선정 저항으로 목표 달성을 다시 검사합니다.</p></>}
+         </>}
        {opticalNotice&&<p role="status" className="model-chip">{opticalNotice}</p>}
        {!opticalCap.canInvert&&<p className="subtle">이 LED는 광도 역산의 근거가 부족합니다. 전류 목표는 사용할 수 있습니다.</p>}
        <div className="fields two"><label className="field" htmlFor="goal-criterion"><span>목표 판정 기준</span>
@@ -213,8 +213,8 @@ export default function App(){
           <option value="minimum">최소 목표 이상 (미만이면 미달)</option><option value="approximate">목표 ± 허용 오차 이내</option>
          </select></label>
          {criterion==='approximate'&&<NumberField name="tolerancePct" label="허용 오차" unit="±%" value={tolerancePct} onChange={setTolerancePct}/>}</div>
-       <div className="fields two"><label className="field" htmlFor="series"><span>E-series</span><select id="series" value={series} onChange={e=>setSeries(e.target.value)}>{['E24','E96','E24+E96'].map(s=><option key={s}>{s}</option>)}</select></label><label className="field" htmlFor="strategy"><span>표준값 선택</span><select id="strategy" value={strategy} onChange={e=>setStrategy(e.target.value)}><option value="closest">가장 가까운 저항</option><option value="safe">큰 저항</option><option value="bright">작은 저항</option></select></label></div>
-       {advice&&<div className="series-advice" data-testid="series-advice"><small>{advice.series} · {advice.spacing}. {advice.note} 선택한 계열은 공차를 바꾸지 않습니다 (현재 RLED 공차 ±{config.resistorTolerance}%).</small>
+       <div className="fields two"><label className="field" htmlFor="series"><span>E-series<Help label="E-series 설명">E-series는 표준값 계열이며 실제 부품 공차와 독립입니다. 계열을 바꿔도 공차는 그대로입니다.</Help></span><select id="series" value={series} onChange={e=>setSeries(e.target.value)}>{['E24','E96','E24+E96'].map(s=><option key={s}>{s}</option>)}</select></label><label className="field" htmlFor="strategy"><span>표준값 선택</span><select id="strategy" value={strategy} onChange={e=>setStrategy(e.target.value)}><option value="closest">가장 가까운 저항</option><option value="safe">큰 저항</option><option value="bright">작은 저항</option></select></label></div>
+       {advice&&<div className="series-advice"><Help label="E-series 조언" testid="series-advice">{advice.series} · {advice.spacing}. {advice.note} 선택한 계열은 공차를 바꾸지 않습니다 (현재 RLED 공차 ±{config.resistorTolerance}%).</Help>
         {advice.suggestion&&<button type="button" className="chip" data-action="apply-series-tolerance" onClick={()=>set('resistorTolerance',advice.suggestion.pct)}>공차를 {advice.suggestion.letter} ±{advice.suggestion.pct}%로 설정</button>}</div>}
        {result.sizing&&<div className="selection" data-testid="selected-resistance">
   <span>{show(result.sizing.selected,1,'Ω')}</span><small>연속값 {show(result.sizing.exact,1,'Ω')}</small>
@@ -224,7 +224,7 @@ export default function App(){
      </>}
     <details className="fold rating-fold" id="power-settings"><summary><b>정격·공차·감도 입력</b><span className="fold-summary">{ratingSummary}</span></summary>
       <div className="fields two">
-       <label className="field" htmlFor="package"><span>RLED generic 패키지 preset</span>
+       <label className="field" htmlFor="package"><span>RLED generic 패키지 preset<Help label="패키지 preset 설명">Generic preset은 실제 저항 정격을 보증하지 않습니다.</Help></span>
        <select id="package" value={Object.keys(PACKAGE_PRESETS).find(k=>PACKAGE_PRESETS[k]===config.resistorRating)??'custom'}
          onChange={e=>{if(e.target.value!=='custom')set('resistorRating',PACKAGE_PRESETS[e.target.value]);}}>
         {sortedPresets(PACKAGE_PRESETS).map(([k,v])=><option key={k} value={k}>{k} · {v*1000}mW</option>)}
@@ -236,7 +236,6 @@ export default function App(){
        {number('ambient','주변 온도','°C')}
        <NumberField name="marginPct" label="여유 경고 기준" unit="한계 대비 %" value={marginPct} onChange={setMarginPct}/>
       </div>
-      <p className="subtle">Generic preset은 실제 모든 해당 크기 저항의 정격을 보증하지 않습니다.</p>
      <h3 className="fold-sub">공차 · 감도</h3>
     <div className="fields two">{number('vccTolerance','VLED 변동','±%')}{topologyUsesGPIO(t)&&number('vddTolerance','GPIO 전원 변동','±%')}{number('resistorTolerance','RLED 공차','±%')}{number('vfSpread','LED Vf 이동 가정','±V')}</div>
      <div className="tolerance-presets" role="group" aria-label="공차 빠른 선택">
@@ -244,10 +243,9 @@ export default function App(){
         <button key={v} type="button" className={cls(config.resistorTolerance===v&&'active')} aria-pressed={config.resistorTolerance===v} onClick={()=>set('resistorTolerance',v)}>{label}</button>)}
       </div>
       <p className="subtle tolerance-readout" data-testid="tolerance-readout" role="status">{toleranceReadout(config.resistorTolerance).text}</p>
-      <p className="subtle">E-series는 표준값 계열이며 실제 부품 공차와 독립입니다. 계열을 바꿔도 위 공차는 그대로입니다.</p>
      {q1?.family==='digital-npn'&&<label className="check"><input id="include-dtc" type="checkbox" checked={includeDtc} onChange={e=>{setIncludeDtc(e.target.checked);setCornerSnapshot(null);}}/> Q1 R1 및 R2/R1 공차 포함</label>}
      <button className="primary" disabled={!p||manualRunning} onClick={runManual}>{manualRunning?'분석 중…':'현재 조건 분석'}</button>
-     <p className="subtle">{autoCorners?'기본 표본(공차 축 곱)은 입력이 멈추면 자동으로 계산합니다. 버튼은 다시 실행할 때 씁니다.':'DTC 내부 공차를 포함한 확장 분석은 느리므로 직접 실행합니다.'}</p>
+     <Help label="분석 실행 설명">{autoCorners?'기본 표본(공차 축 곱)은 입력이 멈추면 자동으로 계산합니다. 버튼은 다시 실행할 때 씁니다.':'DTC 내부 공차를 포함한 확장 분석은 느리므로 직접 실행합니다.'}</Help>
     </details>
     </section>
     {!result.ok&&<section className="notice error" role="alert"><h2>계산할 수 없는 조건</h2><p>{result.error.message}</p><small>{result.error.code}</small></section>}
@@ -264,7 +262,7 @@ export default function App(){
   show(p.optical?.nominalMcd,1,'mcd')}
   hint={p.optical?.kind==='range'?'광도 bin × 상대곡선 · 보증 아님':optical.label}/>
      </div></section>
-     <section className="notice model-note"><strong>모델 가정</strong><p>선택한 실제 품번의 datasheet 곡선/표를 사용하며, 자료가 없는 조건은 근사·미모델링으로 표시합니다.</p><details><summary>근사·외삽·미모델링 ({p.flags.length})</summary><ul>{p.flags.map(f=><Flag key={f} value={f}/>)}</ul></details></section>
+     <section className="notice model-note"><strong>모델 가정<Help label="모델 가정 설명">선택한 실제 품번의 datasheet 곡선/표를 사용하며, 자료가 없는 조건은 근사·미모델링으로 표시합니다.</Help></strong><details><summary>근사·외삽·미모델링 ({p.flags.length})</summary><ul>{p.flags.map(f=><Flag key={f} value={f}/>)}</ul></details></section>
      <section className="panel"><h2>소자별 전력과 정격</h2>
       <div className="table-scroll"><table><thead><tr><th>ref</th><th>전류</th><th>전압</th><th>DC 전력</th></tr></thead><tbody>{p.ledger.map((e,i)=><tr key={e.id+i} data-instance-id={e.instanceId}><th>{e.id}</th><td>{show(e.current,1000,'mA')}</td><td>{show(e.voltage,1,'V')}</td><td>{show(e.power,1000,'mW')}</td></tr>)}</tbody></table></div>
       <details><summary>전체 한계 검사</summary><div className="table-scroll"><table><thead><tr><th>항목</th><th>계산값</th><th>한계</th><th>상태</th></tr></thead><tbody>{result.validation.checks.map(x=><tr key={x.id} className={x.status==='exceeded'?'limit-error':''}><th title={x.condition}>{x.id}</th><td>{show(x.actual,x.unit==='A'||x.unit==='W'?1000:1,x.unit==='A'?'mA':x.unit==='W'?'mW':x.unit)}</td>
@@ -274,7 +272,6 @@ export default function App(){
      <details className="fold" data-fold="sensitivity"><summary><b>감도 상세 (극값 조건 표)</b><span className="fold-summary">{corners?(corners.error?'계산 오류':corners.validCount+'/'+corners.count+'개 조건 계산'):'아직 계산 전'}</span></summary>
      {corners&&(corners.error?<p role="alert">{corners.error}</p>:<div className="corner-results"><p>{corners.validCount}/{corners.count} 조건 계산 · {corners.failures.length}개 미지원/실패 · {corners.failures.length?'일부 조건 제외됨':corners.anyExceeded?'한계 초과 조건 있음':'계산한 표본의 검사 완료'}</p>
        <SensitivityWitness corners={corners} point={p} config={p.config}/></div>)}
-      {!corners&&<p className="subtle">공차 입력을 바꾸면 자동으로 계산합니다.</p>}
      </details>
      <details className="fold" data-fold="evidence"><summary><b>선택 부품의 데이터 근거</b><span className="fold-summary">{parts.length}개 소자</span></summary>
     <section className="panel"><h2>선택 부품의 데이터 근거</h2><div className="evidence-grid">{parts.map(({instanceId,role,modelId,part})=>{const ev=partEvidence(part),src=ev?.source;return<article className="evidence-card" key={instanceId}><div><b>{instanceId}</b><span>{role}</span></div><strong>{part.name??part.id}</strong><small>{ev?.modelKind}</small>{src&&(src.url?<a href={src.url} target="_blank" rel="noreferrer">{src.manufacturer} · {src.revision} <ExternalLink size={12}/></a>:

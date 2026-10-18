@@ -5,7 +5,7 @@ import { opticalAtCurrent,opticalCapability,opticalValueForBasis,opticalUsageGui
 import { DEFAULT_CONFIG,transitionConfig } from '../src/core/topologies.js';
 import { selectResistance } from '../src/core/analysis.js';
 const close=(a,b,tol=1e-5)=>assert.ok(Math.abs(a-b)<=tol,`expected ${a} ≈ ${b}`);
-const kt=['KT-0805R','KT-0805G','KT-0805B','KT-0805YG','KT-0805O'];
+const kt=['KT-0805R','KT-0805G','KT-0805B','KT-0805YG','KT-0805Y','KT-0805O'];
 for(const id of kt) {
  test(id+' optical anchor preserves original bin edges and no fake typ',()=>{
   const o=LEDS[id].optical,r=opticalAtCurrent(id,o.testCurrent);
@@ -33,9 +33,12 @@ test('O relative shape peaks then decreases: inverse chooses earliest increasing
 test('unsupported optical shapes fail typed instead of inventing values',()=>{
  assert.equal(opticalAtCurrent('KT-0805W',.005).kind,'test-point');
  assert.equal(opticalAtCurrent('KT-0805W',.010).kind,'unavailable');
- assert.equal(opticalAtCurrent('KT-0805Y',.01).kind,'unavailable');
  assert.throws(()=>solveOpticalCurrent('KT-0805W',50),{code:'unsupported'});
- assert.throws(()=>solveOpticalCurrent('KT-0805Y',50),{code:'unsupported'});
+ // Y carries its own p.5 curves (digitized from its C2296 sheet), so it behaves like the other range LEDs.
+ assert.equal(opticalAtCurrent('KT-0805Y',.01).kind,'range');
+ const y=solveOpticalCurrent('KT-0805Y',50,{basis:'min'});
+ assert.ok(y.current>.008&&y.current<.016);
+ assert.throws(()=>solveOpticalCurrent('KT-0805Y',100,{basis:'min'}),{code:'out-of-domain'},'its curve peaks near 1.2x of the 70 mcd minimum');
  assert.throws(()=>solveOpticalCurrent('KT-0805R',1e5),{code:'out-of-domain'});
 });
 test('range result has qualitative crossed bands, not a perceived brightness number',()=>{

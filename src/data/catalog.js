@@ -56,12 +56,14 @@ const kentoBins = (voltage, wavelength) => ({
 });
 const VBIN_20 = { current: .02, rows: [['VE', 1.8, 1.9], ['VF', 1.9, 2.0], ['VG', 2.0, 2.1], ['VH', 2.1, 2.2], ['VI', 2.2, 2.3], ['VJ', 2.3, 2.4]] };
 const VBIN_5 = { current: .005, rows: [['VM', 2.6, 2.7], ['VN', 2.7, 2.8], ['VO', 2.8, 2.9], ['VP', 2.9, 3.0], ['VQ', 3.0, 3.1]] };
-const kentoOptical = (source, testCurrent, minMcd, maxMcd, points, intensityBins = []) => ({
+const kentoOptical = (source, testCurrent, minMcd, maxMcd, points, intensityBins = [], tempPoints = null) => ({
     nominalMcd: null, minMcd, maxMcd, testCurrent,
     intensityBins: binRows(intensityBins),
     convention: 'Datasheet gives a min/max intensity bin range, not a single typical absolute-intensity anchor.',
     relative: graph(source, 'p.5 Relative intensity vs. forward current', 'Ta=25°C; normalized near 20mA; typical, coarse manual reading', mA(points), false),
-    temperature: kentoTemp(source),
+    temperature: tempPoints
+        ? graph(source, 'p.5 Relative intensity vs. ambient temperature', 'Ta curve; typical, digitized from the p.5 chart against its gridlines', tempPoints, false)
+        : kentoTemp(source),
 });
 Object.assign(LEDS, {
     'KT-0805R': {
@@ -111,17 +113,18 @@ Object.assign(LEDS, {
         notes: ['Vf table is 1.8–2.4V @10mA; IV is24–70mcd @20mA.', 'Absolute DC current is25mA.'],
     },
     'KT-0805Y': {
-        id: 'KT-0805Y', name: 'KT-0805Y (Yellow) · Hubei KENTO', color: '#d7ae39', source: 'kentoY', kind: 'datasheet-table-only', lcscId: 'C2296',
-        vfTableOnly: { current: .01, min: 1.8, max: 2.4, nominalAssumption: 2.1, condition: 'p.3 Electrical/optical characteristics, Ta=25°C (A.0 / 2018-12-06); midpoint is an explicit table-only assumption, the forward curve is not digitized' },
+        id: 'KT-0805Y', name: 'KT-0805Y (Yellow) · Hubei KENTO', color: '#d7ae39', source: 'kentoY', kind: 'manual-curve', lcscId: 'C2296',
+        // Curves are read from the pixels of the exact C2296 sheet (A.0 / 2018-12-06, p.5) against its own gridlines; see docs/MODELS.md.
+        vf: graph('kentoY', 'p.5 Forward current vs. forward voltage', 'Ta=25°C; typical, digitized from the p.5 chart against its gridlines', mA([[1,1.869],[2,1.887],[3,1.909],[5,1.938],[7.5,1.953],[10,1.97],[12.5,1.98],[15,1.988],[17.5,1.998],[20,2.009],[22.5,2.014],[25,2.019],[27.5,2.026],[30,2.029],[35,2.029]]), false),
         vfTest: { current: .01, min: 1.8, typ: null, max: 2.4, condition: 'p.3 Electrical/optical characteristics, Ta=25°C' },
         vfBins: { current: .02, min: 1.8, max: 2.4, condition: 'p.4 voltage bin table' },
-        // Own sheet (A.0 / 2018-12-06): 70–175 mcd at IF=20mA. The relative-current curve on p.5 is not digitized, so the model is a test point only.
-        optical: { nominalMcd: null, minMcd: 70, maxMcd: 175, testCurrent: .02, relative: null, temperature: null,
-            intensityBins: binRows([['P18', 70, 85], ['P19', 85, 100], ['P20', 100, 120], ['P21', 120, 145], ['P22', 145, 175]]),
-            convention: 'Datasheet gives a min/max intensity bin range at the 20mA test point only; the p.5 relative-current curve is not digitized, so no other current is modeled.' },
+        optical: kentoOptical('kentoY', .02, 70, 175, [[0,0],[2.5,.15],[5,.31],[7.5,.45],[10,.595],[12.5,.715],[15,.82],[17.5,.92],[20,1],[22.5,1.07],[25,1.12],[27.5,1.155],[30,1.18],[32.5,1.195],[35,1.2],[37.5,1.185],[40,1.17]],
+            [['P18', 70, 85], ['P19', 85, 100], ['P20', 100, 120], ['P21', 120, 145], ['P22', 145, 175]],
+            [[-40,1.107],[-20,1.08],[0,1.048],[20,1.008],[25,.998],[40,.97],[60,.921],[80,.871],[85,.855]]),
         bins: kentoBins(VBIN_20, { current: .02, rows: [['Y3', 584, 586], ['Y4', 586, 588], ['Y5', 588, 590], ['Y6', 590, 592], ['Y7', 592, 594]] }),
         limits: { current: .025, pulseCurrent: .06, power: .04, reverse: 5, maxTemperature: 85, minTemperature: -40 },
-        notes: ['C2296 A.0 / 2018-12-06 sheet: IV 70–175mcd @20mA, Vf 1.8–2.4V @10mA, Pd 40mW, IF 25mA, IFP 60mA (1/10 duty, 0.1ms), VR 5V, −40…85°C.', 'The p.5 curves (Vf, relative intensity vs current and temperature) are not digitized here, so Vf uses an explicitly labeled 2.1V midpoint and optical output exists only at the 20mA test point.', 'Sibling KT parts are not used to fill any value.'],
+        currentDerating: graph('kentoY', 'p.5 Maximum forward current vs. ambient temperature', 'digitized from the p.5 chart against its gridlines (reference derating graphic)', [[-40,.025],[25,.025],[40,.02055],[60,.01472],[80,.00818],[85,.0066]], false),
+        notes: ['C2296 A.0 / 2018-12-06 sheet: IV 70–175mcd @20mA, Vf 1.8–2.4V @10mA, Pd 40mW, IF 25mA, IFP 60mA (1/10 duty, 0.1ms), VR 5V, −40…85°C.', 'The p.5 curves were digitized from this sheet only; sibling KT parts are not used to fill any value.', 'Typical curves are not production min/max envelopes.'],
     },
     'KT-0805O': {
         id: 'KT-0805O', name: 'KT-0805O (Orange) · Hubei KENTO', color: '#ef933f', source: 'kentoO', kind: 'manual-curve', lcscId: 'C110371',

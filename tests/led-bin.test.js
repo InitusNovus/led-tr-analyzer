@@ -60,7 +60,7 @@ test('a selected bin narrows the range at the test current, drops the typical an
     assert.deepEqual([g.minMcd, g.maxMcd], [250, 300], 'G bins are sheet values at 5 mA');
     const y = opticalAtCurrent('KT-0805Y', .02, 25, undefined, 'P20');
     assert.deepEqual([y.minMcd, y.maxMcd], [100, 120]);
-    assert.equal(y.kind, 'test-point');
+    assert.equal(y.kind, 'range');
 });
 
 test('the target inverse follows the bin: a bin whose minimum equals the target needs exactly the test current', () => {
@@ -71,7 +71,8 @@ test('the target inverse follows the bin: a bin whose minimum equals the target 
     const p23 = solveOpticalCurrent('KT-0805R', 100, { basis: 'min', bin: 'P23' });
     assert.ok(p23.current < p20.current);
     assert.equal(opticalCapability('KT-0805R', 'P21').canInvert, true);
-    assert.equal(opticalCapability('KT-0805Y', 'P21').canInvert, false, 'Y has a test point only');
+    assert.equal(opticalCapability('KT-0805Y', 'P21').canInvert, true, 'Y now has its own relative-current curve');
+    assert.equal(opticalCapability('KT-0805W', null).canInvert, false, 'W is a single test point');
 });
 
 test('the whole analysis uses the bin: operating point, sizing and goal', () => {

@@ -28,19 +28,20 @@ test('KT-0805 datasheet links are sourced and absolute limits are no longer synt
     near(LEDS['KT-0805Y'].limits.current, .025);   // Y's own A.0 sheet; no sibling value is borrowed
     near(LEDS['KT-0805W'].limits.power, .08);
 });
-test('KT table-only Y/W models expose midpoint/current-shape assumptions instead of fake curves', () => {
-    const y = context();
-    near(ledVoltage('KT-0805Y', .01, 25, 0, y), LEDS['KT-0805Y'].vfTableOnly.nominalAssumption);
-    assert.ok(y.flags.has('approximation:LED-table-midpoint'));
-    assert.equal(y.flags.has('not-modeled:LED-vf-current-shape'), false);   // the test current (10 mA) is now known
-    const yAway = context();
-    ledVoltage('KT-0805Y', .02, 25, 0, yAway);
-    assert.ok(yAway.flags.has('extrapolation:LED-table-only-current'));
+test('KT-0805Y is a curve model from its own sheet, W stays a table-only model', () => {
+    const yc = context();
+    const vf10 = ledVoltage('KT-0805Y', .01, 25, 0, yc);
+    assert.ok(vf10 > 1.9 && vf10 < 2.0, 'curve value read from the C2296 p.5 chart, not the 2.1 V midpoint');
+    assert.equal(yc.flags.has('approximation:LED-table-midpoint'), false);
+    assert.equal(LEDS['KT-0805Y'].vfTableOnly, undefined);
     assert.equal(luminousIntensity('KT-0805Y', .02, 25, context()), null);   // a 70–175 mcd range, no invented typ
     const yo = opticalAtCurrent('KT-0805Y', .02);
-    assert.equal(yo.kind, 'test-point');
+    assert.equal(yo.kind, 'range');
     assert.deepEqual([yo.minMcd, yo.maxMcd], [70, 175]);
-    assert.equal(opticalAtCurrent('KT-0805Y', .01).kind, 'unavailable');   // no current dependence is inferred
+    assert.ok(opticalAtCurrent('KT-0805Y', .035).maxMcd > yo.maxMcd, 'the digitized curve peaks near 35 mA at about 1.2x');
+    assert.ok(opticalAtCurrent('KT-0805Y', .04).maxMcd < opticalAtCurrent('KT-0805Y', .035).maxMcd);
+    const y = LEDS['KT-0805Y'];
+    for (const g of [y.vf, y.optical.relative, y.optical.temperature, y.currentDerating]) assert.equal(g.source, 'kentoY', 'no value comes from a sibling sheet');
 
     const w = LEDS['KT-0805W'], wc = context();
     near(ledVoltage('KT-0805W', w.vfTest.current, 25, 0, wc), w.vfTableOnly.nominalAssumption);
@@ -134,7 +135,7 @@ test('model registry exposes independently sourced selectable NPN/NMOS alternati
 });
 test('optical inverse missing relative curve fails as typed unsupported rather than TypeError', async () => {
     const { selectResistance } = await import('../src/core/analysis.js');
-    for(const led of ['KT-0805Y','KT-0805W'])
+    for(const led of ['KT-0805W'])
         assert.throws(()=>selectResistance({...DEFAULT_CONFIG,led},.005,{targetMcd:10}),e=>e?.code==='unsupported');
 });
 
