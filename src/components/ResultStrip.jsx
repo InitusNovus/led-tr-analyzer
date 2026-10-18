@@ -9,6 +9,7 @@ function opticalText(optical) {
     if (!optical) return '—';
     if (optical.kind === 'range') return amount(optical.minMcd, 1, 'mcd') + ' … ' + amount(optical.maxMcd, 1, 'mcd');
     if (optical.kind === 'unavailable') return '미모델링';
+    if (Number.isFinite(optical.minMcd) && Number.isFinite(optical.nominalMcd)) return amount(optical.nominalMcd, 1, 'mcd') + ' typ · min ' + amount(optical.minMcd, 1, 'mcd');
     return amount(optical.nominalMcd, 1, 'mcd');
 }
 

@@ -547,6 +547,30 @@ console.log(JSON.stringify(out))"""],cwd=ROOT,text=True))
   check(page.locator('#target-slider').is_visible() and page.locator('[data-testid="selected-resistance"]').is_visible(),'sizing controls and the selected resistance are reachable on the phone')
   check(abs(doc_top()-circuit_top)<2,'switching mode does not move the circuit: '+str((circuit_top,doc_top()))+' strip '+str(page.locator('[data-testid="result-strip"]').bounding_box()))
   page.get_by_role('button',name='저항으로 검증',exact=True).click();expect(page.locator('#resistance')).to_be_visible()
+  scenario('G17')
+  # Everlight series (0805 / 0603 / 0402): the LED list is grouped by family and package; the intensity grade is in the part number.
+  page.set_viewport_size({'width':1365,'height':1000});load();page.get_by_role('button',name='전체 초기화',exact=True).click()
+  groups=page.locator('#led optgroup').evaluate_all('els=>els.map(e=>e.label)')
+  check(groups==['Kingbright 0805','KENTO 0805','Everlight 0805','Everlight 0603','Everlight 0402'],'LED list is grouped by family and package: '+str(groups))
+  counts=page.locator('#led optgroup').evaluate_all('els=>els.map(e=>e.querySelectorAll("option").length)')
+  check(counts[2:]==[6,7,5],'Everlight sets are 6 (0805), 7 (0603), 5 (0402): '+str(counts))
+  page.locator('#led').select_option('17-21UYC/S530-A3/4T')   # Iv min 40 / typ 62 mcd @20mA
+  page.get_by_role('button',name='저항으로 검증',exact=True).click();page.locator('#resistance').fill('150')
+  import re
+  txt=page.locator('[data-strip="optical"] b').inner_text()
+  nums=[float(x) for x in re.findall(r'[\d.]+',txt.replace(',',''))]
+  check('typ' in txt and 'min' in txt and len(nums)==2 and nums[1]<nums[0],'min/typ sheet shows typ with the guaranteed min beside it: '+txt)
+  page.locator('.setup-panel [data-testid="quick-specs"]').first.locator('details summary').click()
+  spec=page.locator('.setup-panel [data-testid="quick-specs"]').first.inner_text()
+  check('40 mcd min / 62 mcd typ' in spec and 'DSE' in page.locator('.source-line, .evidence-card').first.inner_text()+spec+page.locator('body').inner_text(),'quick spec lists min / typ and the sheet is cited')
+  page.get_by_role('button',name='목표에서 저항 선정',exact=True).click();page.locator('#target-kind').select_option('mcd')
+  opts=page.locator('#optical-basis option').all_inner_texts()
+  check(any('min 기준' in o for o in opts) and any('typ' in o for o in opts) and not any('대표값' in o for o in opts),'basis offers min and typ but no midpoint for a min/typ sheet: '+str(opts))
+  check(page.locator('#optical-basis').input_value()=='min','default basis is the guaranteed minimum')
+  # a min/max sheet exposes its CAT ranks as the intensity-grade selector
+  page.locator('#led').select_option('16-213/R6C-AQ2R2B/3T')
+  ranks=[o.split(' ')[0] for o in page.locator('#led-bin option').all_inner_texts()]
+  check(ranks==['미지정','Q2','R1','R2'],'part-number ranks Q2..R2 are the selectable grades: '+str(ranks))
   scenario('G16')
   # Explanations sit behind ? buttons: hidden by default, shown on hover / focus / tap, closed by Esc or an outside tap.
   page.get_by_role('button',name='전체 초기화',exact=True).click();page.locator('#led').select_option('KT-0805R')

@@ -20,7 +20,8 @@
 
 ## 부품 선택과 데이터 근거
 
-- KT-0805 R/G/B/YG/O는 기존 소스에 기록되어 있던 LCSC/KENTO 원문을 복구해 characteristic curve와 정격을 다시 연결했습니다. Y/W는 확인 가능한 표/metadata만 쓰고, 읽지 못한 시험조건은 형제 품번에서 추정하지 않습니다.
+- KT-0805 R/G/B/YG/O/Y는 LCSC/KENTO 원문의 characteristic curve와 정격을 연결했습니다(Y는 p.5 차트를 직접 판독). W는 확인 가능한 표/metadata만 쓰고, 읽지 못한 시험조건은 형제 품번에서 추정하지 않습니다.
+- **Everlight 0805·0603·0402 시리즈** 18종(빨강·노랑·연두·파랑·초록·흰색, 0603은 주황 포함)은 광도 등급이 품번에 들어 있고 JLCPCB 재고가 많은 품번을 골라, 각 품번 **자기 데이터시트**의 표와 차트에서 옮겼습니다. 목록·품번 읽는 법·시트 문제는 `docs/MODELS.md`.
 - 기본 LED인 **Kingbright APT2012SURCK**는 KT 계열과 별개의 reference 모델입니다.
 - 일반 NPN은 **MMBT3904LT1G / BC847B**, NMOS는 **2N7002 / BSS138BKW**를 실제 품번으로 선택할 수 있습니다. PNP, PMOS, digital NPN, GPIO는 현재 family당 한 개의 검증 모델만 노출하며 가짜 후보를 만들지 않습니다.
 - DTC043ZEB의 외부 입력전류 II, 내부 베이스전류 IB, 외부 전류이득 GI를 구별합니다.
@@ -66,6 +67,8 @@ src/ui/viewModel.js        소자·결과·근거 표시 adapter
 src/ui/tolerance.js        공차 등급(J/G/F/B)·E-series 맥락·탐색 눈금 (값은 바꾸지 않고 안내만)
 docs/FONTS.md              글꼴(JetBrains Mono + Pretendard), 라이선스, 용량
 scripts/digitize_kento_y.py KT-0805Y p.5 곡선을 PDF 픽셀에서 재현 (격자선 기준)
+scripts/digitize_everlight.py Everlight 시트의 4개 곡선(Vf·Iv–If·Iv–Ta·열화)을 격자선 기준으로 판독하고 확인용 오버레이 이미지를 만듦
+src/data/everlight.js      Everlight 18종 (시트 표 + 판독한 곡선, DSE 번호별 source)
 src/components/            실제 심볼 회로도와 오류 경계
 src/App.jsx                한국어 workbench, 실제 부품 선택, JSON 내보내기
 ```
@@ -79,7 +82,7 @@ src/App.jsx                한국어 workbench, 실제 부품 선택, JSON 내�
 
 - Hubei KENTO **KT-0805 R/G/B/YG/O**는 제조사 시험점의 **광도 min/max bin**과 전형적 `relative Iv vs If`를 결합해 범위로 표시합니다. 시험점과 정규화 전류가 다르면 상대광도 **비율**로 환산합니다. 이는 다른 전류에서의 제조사 보증 범위가 아닙니다.
 - 광도 목표는 **최저 bin 기준 추정**, 실제 **typ 기준**(typ 절대 anchor가 있는 경우만), 또는 명시적 **중간 대표값 가정** 중 근거가 존재하는 기준으로 역산합니다. 곡선 범위 밖을 자동 외삽하지 않습니다.
-- `KT-0805W`는 5mA 절대 광도 시험점만 표시하며, `KT-0805Y`는 시험전류 미확인으로 임의 광도 역산하지 않습니다.
+- `KT-0805W`는 5mA 절대 광도 시험점만 표시합니다. Everlight의 `…/S530-A3` 같은 min/typ 시트는 typ와 **보증 min**을 함께 보여 주고, min 기준(기본)·typ 기준으로 역산합니다(시험전류 밖에서 스케일한 min은 보증값이 아닙니다).
 - mcd “사용감 가이드”는 초기판의 표시등 설계 팁을 **휴리스틱**으로 복구한 것입니다. 눈부심·지각 밝기·조도(lux)의 계산 결과나 안전 판정이 아닙니다.
 - **mA/mcd 목표값은 독립 보존**됩니다. 광도 미지원 LED로 바꿔도 이전 숫자가 다른 단위로 다시 해석되지 않습니다.
 - **Nominal과 sampled Min–Max를 한 요약에서** 봅니다. LED 전류 띠가 nominal과 sampled 최소·최대, 계산된 조건 수, 스윕한 축(VLED·GPIO 전원·RLED·Vf 이동)을 보여주고, 극값별 입력 조건 표와 스윕하지 않은 조건(RB/RE, 온도, 전형 곡선 등)을 함께 표시합니다. 기본 표본은 입력이 멈추면 자동으로 계산하며 계산 중에도 입력할 수 있고, DTC 내부 공차 확장(729개)은 직접 실행합니다. 입력이 바뀌면 이전 결과를 버리고, 일부 조건이 모델 적용범위 밖이면 제외한 개수를 표시하며 전체 통과로 보이지 않게 합니다. 광도는 bin 범위, 전기 조건 변동만, 둘을 결합한 추정을 따로 보여줍니다.
