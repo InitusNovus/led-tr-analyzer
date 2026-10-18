@@ -23,6 +23,9 @@ MUTATIONS=[
  ('mcd-guide-removed','src/components/DesignSummary.jsx','{optical.usageGuide&&<p className="mcd-guide"','{false&&<p className="mcd-guide"',{'G03'}),
  ('led-bin-ignored','src/core/optics.js',"const part=ledModel(id,binId);","const part=ledModel(id);",{'G15','unit'}),
  ('led-bin-leaks-across-leds','src/ui/designState.js',"led: action.id, ledBin: null }","led: action.id }",{'G15','unit'}),
+ ('min-basis-needs-range','src/core/optics.js',"if(basis==='min'&&!cap.hasMin||","if(basis==='min'&&!cap.hasRange||",{'G17','unit'}),
+ ('min-not-scaled-with-current','src/core/optics.js',"const minMcd=cap.hasMin?Math.max(0,o.minMcd*scale):null;","const minMcd=cap.hasMin?Math.max(0,o.minMcd):null;",{'unit','G17'}),
+ ('led-list-ungrouped','src/App.jsx',"<optgroup key={g} label={g}>","<optgroup key={g} label=\"LED\">",{'G17'}),
  ('phone-schematic-shrunk','src/index.css',".schematic svg{min-width:640px}",".schematic svg{min-width:420px}",{'G13','G14'}),
 ]
 def run(cmd,**kw): return subprocess.run(cmd,cwd=ROOT,capture_output=True,text=True,**kw)

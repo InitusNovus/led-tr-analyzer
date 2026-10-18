@@ -10,7 +10,7 @@ const amount=(v,scale=1,unit='')=>v==null||!Number.isFinite(v)?'—':(v*scale).t
 function OpticalResult({optical}){
  if(!optical)return null;
  const range=optical.kind==='range',value=range?amount(optical.minMcd,1,'mcd')+' … '+amount(optical.maxMcd,1,'mcd'):
-  optical.kind==='unavailable'?'현재 조건 미모델링':amount(optical.nominalMcd,1,'mcd');
+  optical.kind==='unavailable'?'현재 조건 미모델링':Number.isFinite(optical.minMcd)&&Number.isFinite(optical.nominalMcd)?amount(optical.nominalMcd,1,'mcd')+' typ · min '+amount(optical.minMcd,1,'mcd'):amount(optical.nominalMcd,1,'mcd');
  return <div className="design-optical"><div><strong>광도 추정<Help label="광도 추정 설명">{range?'원문 광도 bin × 상대 광도 곡선. 다른 전류에서 min/max 보증값이 아닙니다.':
     optical.kind==='test-point'?'원문 단일 시험점 전용':'typ 곡선 기반 또는 미지원 조건'}</Help></strong><b>{value}</b></div>
   {optical.usageGuide&&<p className="mcd-guide" data-testid="mcd-guide" role="note"><strong className="mcd-guide-label">{optical.usageGuide.label}</strong><Help label="사용 안내" testid="mcd-guide-note">{optical.usageGuide.note}</Help></p>}

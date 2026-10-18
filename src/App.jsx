@@ -19,6 +19,7 @@ import { sortedPresets } from './core/warnings.js';
 import { toleranceReadout, seriesAdvice, exploreScale } from './ui/tolerance.js';
 import'./index.css';
 
+const ledGroups=Object.entries(Object.values(LEDS).reduce((m,l)=>((m[l.group??'기타']??=[]).push(l),m),{}));
 const show=(v,scale=1,unit='')=>v==null||!Number.isFinite(v)?'—':(v*scale).toLocaleString('en-US',{maximumSignificantDigits:4})+(unit?' '+unit:'');
 const cls=(...v)=>v.filter(Boolean).join(' ');
 function Flag({value}){return<li>{flagText(value)}</li>;}
@@ -134,7 +135,7 @@ export default function App(){
    <div className="panel setup-panel"><h2>회로와 실제 부품</h2>
     <label className="field" htmlFor="topology"><span>토폴로지<Help label="토폴로지 설명">{t.path}<br/>토폴로지 전환 시 기본 ON 상태({t.active})로 설정됩니다.</Help></span><select id="topology" value={config.topology} onChange={e=>changeTopology(e.target.value)}>{TOPOLOGIES.map(x=><option key={x.id} value={x.id}>{x.family} · {x.name}</option>)}</select></label>
     <details className="topology-gallery"><summary>지원 회로 13종 보기</summary><div className="topology-cards">{TOPOLOGIES.map(x=><button key={x.id} className={cls(config.topology===x.id&&'active')} onClick={()=>changeTopology(x.id)}><b>{x.name}</b><small>{x.path}</small></button>)}</div></details>
-    <label className="field" htmlFor="led"><span>LED1</span><select id="led" value={config.led} onChange={e=>changeLed(e.target.value)}>{Object.values(LEDS).map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</select></label>
+    <label className="field" htmlFor="led"><span>LED1</span><select id="led" value={config.led} onChange={e=>changeLed(e.target.value)}>{ledGroups.map(([g,list])=><optgroup key={g} label={g}>{list.map(l=><option key={l.id} value={l.id}>{l.name}</option>)}</optgroup>)}</select></label>
     {ledBins.length>0&&<div className="led-bin" data-testid="led-bin">
       <label className="field" htmlFor="led-bin"><span>광도 등급 (bin)<Help label="광도 등급 설명" className="led-bin-help" testid="led-bin-help">데이터시트의 광도 bin은 P코드(P19 …)입니다. 품번 끝의 R1–R5 같은 코드는 같은 데이터시트에서 <b>파장 bin</b>이며 밝기와는 별개입니다. 등급을 고르면 광도 범위와 목표 역산이 그 범위로 좁아지고, 고르지 않으면 지금처럼 전체 bin 범위를 씁니다. 등급은 보증값이 아니라 제조사 분류 범위입니다.</Help><small>선택 안 하면 전체 범위</small></span>
        <select id="led-bin" value={config.ledBin??''} onChange={e=>changeLedBin(e.target.value)}>
@@ -201,7 +202,7 @@ export default function App(){
        </div>}
        {targetKind==='mcd'&&<><label className="field" htmlFor="optical-basis"><span>광도 역산 기준<Help label="광도 추정 설명">광도는 선택 시험점과 전형적 상대곡선 기반 추정입니다. 선정 저항으로 목표 달성을 다시 검사합니다.</Help></span>
          <select id="optical-basis" value={opticalBasis} onChange={e=>{setOpticalBasis(e.target.value);setCornerSnapshot(null);}}>
-          {opticalCap.hasRange&&<option value="min">최저 bin 기준 추정 (보증 아님)</option>}
+          {opticalCap.hasMin&&<option value="min">{opticalCap.hasRange?'최저 bin 기준 추정 (보증 아님)':'데이터시트 min 기준 (시험전류 밖은 보증 아님)'}</option>}
           {opticalCap.hasTypical&&<option value="typ">제조사 typ anchor 기준</option>}
           {opticalCap.hasRange&&<option value="representative">중간 대표값 가정 (typ 아님)</option>}
          </select></label>
@@ -259,7 +260,7 @@ export default function App(){
       {topologyUsesGPIO(t)&&<><Metric label="GPIO 전류 (+source / −sink)" value={show(p.gpioCurrent,1000,'mA')}/><Metric label="GPIO 단자 전압" value={show(p.gpioVoltage,1,'V')}/></>}
       {p.semiconductors.length>0&&<Metric label="출력 driver 전압강하" value={show(p.driverVoltage,1,'V')}/>}
       <Metric label="광학 결과" value={p.optical?.kind==='range'?show(p.optical.minMcd,1,'mcd')+' … '+show(p.optical.maxMcd,1,'mcd'):
-  show(p.optical?.nominalMcd,1,'mcd')}
+  show(p.optical?.nominalMcd,1,'mcd')+(Number.isFinite(p.optical?.minMcd)&&Number.isFinite(p.optical?.nominalMcd)?' typ · min '+show(p.optical.minMcd,1,'mcd'):'')}
   hint={p.optical?.kind==='range'?'광도 bin × 상대곡선 · 보증 아님':optical.label}/>
      </div></section>
      <section className="notice model-note"><strong>모델 가정<Help label="모델 가정 설명">선택한 실제 품번의 datasheet 곡선/표를 사용하며, 자료가 없는 조건은 근사·미모델링으로 표시합니다.</Help></strong><details><summary>근사·외삽·미모델링 ({p.flags.length})</summary><ul>{p.flags.map(f=><Flag key={f} value={f}/>)}</ul></details></section>
