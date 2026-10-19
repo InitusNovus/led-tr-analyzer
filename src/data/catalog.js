@@ -2,9 +2,10 @@
  * Numerical SI values are kept separate from limits and from model assumptions. */
 import { graph, mA, binRows } from './helpers.js';
 import { EVERLIGHT_LEDS, EVERLIGHT_SOURCES } from './everlight.js';
+import { KINGBRIGHT_LEDS, KINGBRIGHT_SOURCES } from './kingbright.js';
 
 export const SOURCES = {
-    kingbright: { manufacturer: 'Kingbright', revision: 'V.21A / 2025-03-17', url: 'https://www.kingbrightusa.com/images/catalog/SPEC/APT2012SURCK.pdf' },
+    ...KINGBRIGHT_SOURCES,
     kentoR: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2295.pdf' },
     kentoG: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2297.pdf' },
     kentoB: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2293.pdf' },
@@ -22,24 +23,7 @@ export const SOURCES = {
     idealControl: { manufacturer: 'User-defined assumption', revision: 'Ideal DC Thevenin source; no manufacturer rating', url: null },
     gpio: { manufacturer: 'STMicroelectronics', revision: 'DS13560 Rev.6', url: 'https://www.st.com/resource/en/datasheet/stm32g0b1cc.pdf' },
 };
-export const LEDS = {
-    'APT2012SURCK': {
-        id: 'APT2012SURCK', name: 'APT2012SURCK · Kingbright', color: '#ee5364', source: 'kingbright', kind: 'manual-curve',
-        vf: graph('kingbright', 'p.3, Forward current vs. forward voltage', 'Ta=25°C; typical', mA([[1, 1.75], [2, 1.79], [5, 1.84], [10, 1.89], [20, 1.95], [30, 2.00]]), false),
-        vfTest: { current: .02, typ: 1.95, max: 2.5, min: null, condition: 'p.2 Electrical/optical characteristics, Ta=25°C' },
-        vfTempCoefficient: -.0019, tempRange: [-10, 85],
-        temperatureNote: '−1.9mV/°C is specified at 20mA only; applying it to the entire curve is an approximation.',
-        optical: {
-            nominalMcd: 230, testCurrent: .02,
-            convention: 'p.1 non-star photometric value (NOT the starred CIE127-2007 80mcd value)',
-            relative: graph('kingbright', 'p.3, Luminous intensity vs. forward current', 'Ta=25°C; normalized at20mA', mA([[0, 0], [5, .25], [10, .5], [20, 1], [30, 1.5]]), false),
-            temperature: graph('kingbright', 'p.3, Luminous intensity vs. ambient temperature', 'If=20mA; typical; applying at other currents is approximate', [[-40, 2], [-20, 1.55], [0, 1.25], [25, 1], [40, .83], [60, .65], [85, .46]], false),
-        },
-        limits: { current: .03, power: .075, reverse: 5, maxTemperature: 85 },
-        currentDerating: graph('kingbright', 'p.3, Forward current derating', 'RthJA=530°C/W; reference PCB; approximate graphic limit', [[-40, .03], [25, .03], [50, .021], [85, .008]], false),
-        notes: ['Distinct reference LED; not a substitute model for KT-0805.', 'Typical curves are not production min/max envelopes.'],
-    },
-};
+export const LEDS = { ...KINGBRIGHT_LEDS };
 // KENTO KT-0805 family. Datasheet curves are coarse manual readings of the exact LCSC-linked sheets.
 // Electrical tables and typical curves are kept distinct; no midpoint is presented as a guaranteed typical value.
 const kentoTemp = (source) => graph(source, 'p.5 Relative intensity vs. ambient temperature', 'Ta curve; typical, coarse manual reading', [[-40, 1.10], [0, 1.04], [25, 1.00], [50, .95], [85, .86]], false);
