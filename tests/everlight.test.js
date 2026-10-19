@@ -13,7 +13,7 @@ const close = (a, b, tol) => assert.ok(Math.abs(a - b) <= tol, `${a} != ${b} (±
 test('Everlight series: 0805 and 0603 and 0402 sets, each part pinned to its own datasheet', () => {
     assert.equal(bySize('0805').length, 6);
     assert.equal(bySize('0603').length, 7);
-    assert.equal(bySize('0402').length, 5);
+    assert.equal(bySize('0402').length, 7);
     for (const l of EV) {
         const src = SOURCES[l.source];
         assert.ok(src && /^DSE-\d{7} Rev\.\d+ \/ \d{4}-\d\d-\d\d$/.test(src.revision), l.id + ' revision ' + src?.revision);
@@ -23,6 +23,16 @@ test('Everlight series: 0805 and 0603 and 0402 sets, each part pinned to its own
     }
     // sources are one per part: no part borrows a sibling's sheet
     assert.equal(new Set(EV.map(l => l.source)).size, EV.length);
+});
+
+test('0402 yellow and orange come from their own 2016 sheets, not from the red/yellow-green ones or the reseller listings', () => {
+    const y = LEDS['16-213UYC/S530-A2/TR8'], o = LEDS['16-213UYOC/S530-A2/TR8'];
+    assert.equal(SOURCES[y.source].revision, 'DSE-0016588 Rev.2 / 2016-12-01');
+    assert.equal(SOURCES[o.source].revision, 'DSE-0016587 Rev.2 / 2016-12-01');
+    assert.deepEqual([y.optical.minMcd, y.optical.nominalMcd], [15, 40]);
+    // the orange sheet's typical is 89 mcd; resellers' "15 mcd" is its minimum
+    assert.deepEqual([o.optical.minMcd, o.optical.nominalMcd], [15, 89]);
+    assert.ok(o.notes.some(n => /15 mcd/.test(n) && /89 mcd/.test(n)));
 });
 
 test('digitized Vf(I) agrees with the sheet table at the test current (cross-check of the chart reading)', () => {

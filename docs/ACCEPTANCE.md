@@ -55,11 +55,11 @@
 | G14 | 모바일 회로 가독성·scroll·mode 전환·overflow 없음 | #23 #29 | 구현 (overflow, 중앙 정렬, 글자 크기, 모바일 순서와 결과 띠 한 줄, 모바일 모드 전환이 회로 위치와 가로 폭을 바꾸지 않음) | 12 |
 | G15 | KENTO 광도 등급(bin) 선택 → 광도 범위·역산·내보내기 (#41) | #41 | 구현 (bin 목록과 P코드/파장 bin 설명, 선택 시 범위가 전체 범위 안에서 좁아짐, 목표 역산 저항이 달라짐, JSON에 기록, LED 변경 시 해제, bin 없는 LED는 선택기 없음) | 13 |
 | G16 | 설명 문구는 `?` 버튼 뒤에 둔다 — 기본은 숨김, 호버·포커스·탭으로 표시, Esc·바깥 탭으로 닫힘, 화면 밖으로 나가지 않음. 보조 글자 12px 이상 | 사용자 피드백 | 구현 (`Help` 컴포넌트, 스모크 G16) |
-| G17 | Everlight 시리즈 — LED 목록이 제품군·크기별로 묶이고, min/typ 시트는 typ와 min을 함께 보여 주며 min 기준 목표 역산을 지원, min/max 시트는 품번 등급(CAT)을 선택기로 제공 | 사용자 요청 | 구현 (데이터 `src/data/everlight.js`, 스모크 G17, `tests/everlight.test.js`) |
+| G17 | Everlight 시리즈(20종) — LED 목록이 제품군·크기별로 묶이고, min/typ 시트는 typ와 min을 함께 보여 주며 min 기준 목표 역산을 지원, min/max 시트는 품번 등급(CAT)을 선택기로 제공 | 사용자 요청 | 구현 (데이터 `src/data/everlight.js`, 스모크 G17, `tests/everlight.test.js`) |
 
 ## 3. 증거와 실행 방법
 
-- 단위·계약 테스트: `npm test` (245개). 브라우저: `npm run test:browser` (실제 `/led-tr-analyzer/` subpath, 365 checks, 시나리오별 집계 출력).
+- 단위·계약 테스트: `npm test` (246개). 브라우저: `npm run test:browser` (실제 `/led-tr-analyzer/` subpath, 365 checks, 시나리오별 집계 출력).
 - 화면 증거: smoke가 `test-results/`에 토폴로지 13종 atlas와 모바일 전체 화면을 저장하고, CI가 `browser-evidence-<run id>` 아티팩트로 14일간 보관합니다.
 - 시나리오가 실패하면 smoke가 `SMOKE_FAILED scenario=<ID>`를 출력합니다.
 
