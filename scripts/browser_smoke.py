@@ -553,7 +553,7 @@ console.log(JSON.stringify(out))"""],cwd=ROOT,text=True))
   groups=page.locator('#led optgroup').evaluate_all('els=>els.map(e=>e.label)')
   check(groups==['Kingbright 0805','KENTO 0805','Everlight 0805','Everlight 0603','Everlight 0402'],'LED list is grouped by family and package: '+str(groups))
   counts=page.locator('#led optgroup').evaluate_all('els=>els.map(e=>e.querySelectorAll("option").length)')
-  check(counts[2:]==[6,7,5],'Everlight sets are 6 (0805), 7 (0603), 5 (0402): '+str(counts))
+  check(counts[2:]==[6,7,7],'Everlight sets are 6 (0805), 7 (0603), 7 (0402): '+str(counts))
   page.locator('#led').select_option('17-21UYC/S530-A3/4T')   # Iv min 40 / typ 62 mcd @20mA
   page.get_by_role('button',name='저항으로 검증',exact=True).click();page.locator('#resistance').fill('150')
   import re

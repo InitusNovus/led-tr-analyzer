@@ -21,7 +21,7 @@
 ## 부품 선택과 데이터 근거
 
 - KT-0805 R/G/B/YG/O/Y는 LCSC/KENTO 원문의 characteristic curve와 정격을 연결했습니다(Y는 p.5 차트를 직접 판독). W는 확인 가능한 표/metadata만 쓰고, 읽지 못한 시험조건은 형제 품번에서 추정하지 않습니다.
-- **Everlight 0805·0603·0402 시리즈** 18종(빨강·노랑·연두·파랑·초록·흰색, 0603은 주황 포함)은 광도 등급이 품번에 들어 있고 JLCPCB 재고가 많은 품번을 골라, 각 품번 **자기 데이터시트**의 표와 차트에서 옮겼습니다. 목록·품번 읽는 법·시트 문제는 `docs/MODELS.md`.
+- **Everlight 0805·0603·0402 시리즈** 20종(빨강·노랑·연두·파랑·초록·흰색, 0603과 0402는 주황 포함)은 광도 등급이 품번에 들어 있고 JLCPCB 재고가 많은 품번을 골라, 각 품번 **자기 데이터시트**의 표와 차트에서 옮겼습니다. 목록·품번 읽는 법·시트 문제는 `docs/MODELS.md`.
 - 기본 LED인 **Kingbright APT2012SURCK**는 KT 계열과 별개의 reference 모델입니다.
 - 일반 NPN은 **MMBT3904LT1G / BC847B**, NMOS는 **2N7002 / BSS138BKW**를 실제 품번으로 선택할 수 있습니다. PNP, PMOS, digital NPN, GPIO는 현재 family당 한 개의 검증 모델만 노출하며 가짜 후보를 만들지 않습니다.
 - DTC043ZEB의 외부 입력전류 II, 내부 베이스전류 IB, 외부 전류이득 GI를 구별합니다.
@@ -68,7 +68,7 @@ src/ui/tolerance.js        공차 등급(J/G/F/B)·E-series 맥락·탐색 눈�
 docs/FONTS.md              글꼴(JetBrains Mono + Pretendard), 라이선스, 용량
 scripts/digitize_kento_y.py KT-0805Y p.5 곡선을 PDF 픽셀에서 재현 (격자선 기준)
 scripts/digitize_everlight.py Everlight 시트의 4개 곡선(Vf·Iv–If·Iv–Ta·열화)을 격자선 기준으로 판독하고 확인용 오버레이 이미지를 만듦
-src/data/everlight.js      Everlight 18종 (시트 표 + 판독한 곡선, DSE 번호별 source)
+src/data/everlight.js      Everlight 20종 (시트 표 + 판독한 곡선, DSE 번호별 source)
 src/components/            실제 심볼 회로도와 오류 경계
 src/App.jsx                한국어 workbench, 실제 부품 선택, JSON 내보내기
 ```
