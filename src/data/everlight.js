@@ -22,6 +22,8 @@ export const EVERLIGHT_SOURCES = {
     ev74338: { manufacturer: 'Everlight', revision: 'DSE-0016552 Rev.4 / 2019-02-14', url: 'https://www.everlighteurope.com/custom/files/datasheets/DSE-0016552.pdf' },
     ev131223: { manufacturer: 'Everlight', revision: 'DSE-0008890 Rev.3 / 2013-05-29', url: 'https://en.everlight.com/wp-content/plugins/ItemRelationship/product_files/pdf/16-213-BHC-AN1P2-3T.pdf' },
     ev264412: { manufacturer: 'Everlight', revision: 'DSE-0000593 Rev.3 / 2013-04-29', url: 'https://en.everlight.com/wp-content/plugins/ItemRelationship/product_files/pdf/16-916-T1D-AP1Q2QY-3T.pdf' },
+    ev136118: { manufacturer: 'Everlight', revision: 'DSE-0016588 Rev.2 / 2016-12-01', url: 'https://www.everlighteurope.com/custom/files/datasheets/DSE-0016588.pdf' },
+    ev88330: { manufacturer: 'Everlight', revision: 'DSE-0016587 Rev.2 / 2016-12-01', url: 'https://www.everlighteurope.com/custom/files/datasheets/DSE-0016587.pdf' },
 };
 
 export const EVERLIGHT_LEDS = {
@@ -333,5 +335,37 @@ export const EVERLIGHT_LEDS = {
         limits: { current: 0.025, pulseCurrent: 0.1, power: 0.095, reverse: 5, maxTemperature: 85, minTemperature: -40 },
         currentDerating: graph('ev264412', 'p.6 Forward current derating curve', 'digitized from the sheet chart (line fitted through its sloped part; reference derating graphic)', [[-40, 0.025], [24.6, 0.025], [60, 0.01291], [85, 0.00439]], false),
         notes: ['DSE-0000593 Rev.3 (2013-04-29): Iv 45–112 mcd @5mA; ratings IF 25mA, IFP 100mA (duty 1/10, 1kHz), Pd 95mW, VR 5V, −40…85°C.', 'The sheet’s voltage-bin table prints 2.9–3.0 V twice (bins 31 and 32), so it is not transcribed.', 'Typical curves are the sheet’s own Everlight chart plates (the same artwork appears on many Everlight sheets); they are not production min/max envelopes.'],
+    },
+    '16-213UYC/S530-A2/TR8': {
+        id: '16-213UYC/S530-A2/TR8', name: '16-213UYC/S530-A2/TR8 (Yellow 0402) · Everlight', color: '#d7ae39', source: 'ev136118', kind: 'manual-curve', lcscId: 'C136118',
+        package: '0402', group: 'Everlight 0402',
+        vf: graph('ev136118', 'p.4 Forward current vs. forward voltage', 'Ta=25°C; typical, digitized from the sheet chart against its gridlines', mA([[1, 1.784], [2, 1.789], [3, 1.81], [5, 1.828], [7.5, 1.855], [10, 1.883], [12.5, 1.912], [15, 1.941], [17.5, 1.969], [20, 1.994], [22.5, 2.024]]), false),
+        vfTest: { current: 0.02, min: 1.7, typ: 2, max: 2.4, condition: 'p.3 Electro-optical characteristics, Ta=25°C' },
+        optical: {
+            nominalMcd: 40, minMcd: 15, maxMcd: null, testCurrent: 0.02,
+            intensityBins: binRows([]),
+            convention: 'Datasheet gives a guaranteed minimum and a typical luminous intensity for this part number; typ is the scaling anchor, min is shown separately.',
+            relative: graph('ev136118', 'p.4 Luminous intensity vs. forward current', 'Ta=25°C; relative to the sheet’s own 100 % level (about 20 mA); typical, digitized from the sheet chart against its gridlines; the solid part of the curve', mA([[0, 0], [2, 0.058], [3, 0.1], [5, 0.215], [7.5, 0.312], [10, 0.504], [12.5, 0.667], [15, 0.8], [17.5, 0.879], [20, 0.99], [22.5, 1.059], [25, 1.107], [27.5, 1.151], [30, 1.193]]), false),
+            temperature: graph('ev136118', 'p.4 Luminous intensity vs. ambient temperature', 'If=20mA curve; typical; normalised to 25°C; digitized from a log axis, about ±3 %', [[-40, 1.169], [-20, 1.115], [0, 1.061], [20, 1.012], [25, 1], [40, 0.966], [60, 0.926], [80, 0.889], [85, 0.887]], false),
+        },
+        limits: { current: 0.025, pulseCurrent: 0.06, power: 0.06, reverse: 5, maxTemperature: 85, minTemperature: -40 },
+        currentDerating: graph('ev136118', 'p.4 Forward current derating curve', 'digitized from the sheet chart (line fitted through its sloped part; reference derating graphic)', [[-40, 0.025], [25.4, 0.025], [60, 0.013], [85, 0.00434]], false),
+        notes: ['DSE-0016588 Rev.2 (2016-12-01): Iv min 15 / typ 40 mcd @20mA; ratings IF 25mA, IFP 60mA (duty 1/10, 1kHz), Pd 60mW, VR 5V, −40…85°C.', 'Typical curves are the sheet’s own Everlight chart plates (the same artwork appears on many Everlight sheets); they are not production min/max envelopes.'],
+    },
+    '16-213UYOC/S530-A2/TR8': {
+        id: '16-213UYOC/S530-A2/TR8', name: '16-213UYOC/S530-A2/TR8 (Orange 0402) · Everlight', color: '#ef933f', source: 'ev88330', kind: 'manual-curve', lcscId: 'C88330',
+        package: '0402', group: 'Everlight 0402',
+        vf: graph('ev88330', 'p.4 Forward current vs. forward voltage', 'Ta=25°C; typical, digitized from the sheet chart against its gridlines', mA([[1, 1.784], [2, 1.792], [3, 1.811], [5, 1.828], [7.5, 1.857], [10, 1.885], [12.5, 1.913], [15, 1.942], [17.5, 1.969], [20, 1.993], [22.5, 2.024]]), false),
+        vfTest: { current: 0.02, min: 1.7, typ: 2, max: 2.4, condition: 'p.3 Electro-optical characteristics, Ta=25°C' },
+        optical: {
+            nominalMcd: 89, minMcd: 15, maxMcd: null, testCurrent: 0.02,
+            intensityBins: binRows([]),
+            convention: 'Datasheet gives a guaranteed minimum and a typical luminous intensity for this part number; typ is the scaling anchor, min is shown separately.',
+            relative: graph('ev88330', 'p.4 Luminous intensity vs. forward current', 'Ta=25°C; relative to the sheet’s own 100 % level (about 20 mA); typical, digitized from the sheet chart against its gridlines; the solid part of the curve', mA([[0, 0], [2, 0.055], [3, 0.105], [5, 0.211], [7.5, 0.34], [10, 0.484], [12.5, 0.637], [15, 0.788], [17.5, 0.902], [20, 1.021], [22.5, 1.089], [25, 1.141], [27.5, 1.185], [30, 1.223]]), false),
+            temperature: graph('ev88330', 'p.4 Luminous intensity vs. ambient temperature', 'If=20mA curve; typical; normalised to 25°C; digitized from a log axis, about ±3 %', [[-40, 1.171], [-20, 1.118], [0, 1.064], [20, 1.013], [25, 1], [40, 0.962], [60, 0.916], [80, 0.881], [85, 0.881]], false),
+        },
+        limits: { current: 0.025, pulseCurrent: 0.06, power: 0.06, reverse: 5, maxTemperature: 85, minTemperature: -40 },
+        currentDerating: graph('ev88330', 'p.4 Forward current derating curve', 'digitized from the sheet chart (line fitted through its sloped part; reference derating graphic)', [[-40, 0.025], [26.1, 0.025], [60, 0.01343], [85, 0.00488]], false),
+        notes: ['DSE-0016587 Rev.2 (2016-12-01): Iv min 15 / typ 89 mcd @20mA; ratings IF 25mA, IFP 60mA (duty 1/10, 1kHz), Pd 60mW, VR 5V, −40…85°C.', 'The sheet’s spectrum chart (not used by the model) peaks near 635 nm although its table gives λd 605 nm; JLCPCB and resellers list 15 mcd, which is this sheet’s minimum, not its typical 89 mcd.', 'Typical curves are the sheet’s own Everlight chart plates (the same artwork appears on many Everlight sheets); they are not production min/max envelopes.'],
     },
 };
