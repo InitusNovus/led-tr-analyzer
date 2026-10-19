@@ -1,5 +1,8 @@
 /** Curated datasheet evidence. Graph points are coarse manual readings, NOT guarantees.
  * Numerical SI values are kept separate from limits and from model assumptions. */
+import { graph, mA, binRows } from './helpers.js';
+import { EVERLIGHT_LEDS, EVERLIGHT_SOURCES } from './everlight.js';
+
 export const SOURCES = {
     kingbright: { manufacturer: 'Kingbright', revision: 'V.21A / 2025-03-17', url: 'https://www.kingbrightusa.com/images/catalog/SPEC/APT2012SURCK.pdf' },
     kentoR: { manufacturer: 'Hubei KENTO', revision: 'A.0 / 2018-12-06', url: 'https://www.lcsc.com/datasheet/C2295.pdf' },
@@ -19,12 +22,6 @@ export const SOURCES = {
     idealControl: { manufacturer: 'User-defined assumption', revision: 'Ideal DC Thevenin source; no manufacturer rating', url: null },
     gpio: { manufacturer: 'STMicroelectronics', revision: 'DS13560 Rev.6', url: 'https://www.st.com/resource/en/datasheet/stm32g0b1cc.pdf' },
 };
-const graph = (source, figure, conditions, points, logX = true, logY = false) => ({
-    source, figure, conditions, points, logX, logY,
-    kind: 'manual-curve', domain: [points[0][0], points.at(-1)[0]],
-    method: 'Coarse manual reading; piecewise interpolation. No digitization accuracy or production spread guaranteed.',
-});
-const mA = (points) => points.map(([i, v]) => [i / 1000, v]);
 export const LEDS = {
     'APT2012SURCK': {
         id: 'APT2012SURCK', name: 'APT2012SURCK · Kingbright', color: '#ee5364', source: 'kingbright', kind: 'manual-curve',
@@ -49,7 +46,6 @@ const kentoTemp = (source) => graph(source, 'p.5 Relative intensity vs. ambient 
 const kentoDerating = (source, rated, end) => graph(source, 'p.5 Maximum forward current vs. ambient temperature', 'typical/reference derating graphic', [[-40, rated], [25, rated], [85, end]], false);
 /** Datasheet p.4 section 6: every KENTO colour is sorted into luminous-intensity (P##), forward-voltage (V#) and wavelength bins.
  * The part number suffix (e.g. the 2 in KT-0805R2) is NOT documented in these sheets; see docs/MODELS.md. */
-const binRows = rows => rows.map(([id, min, max]) => ({ id, min, max }));
 const kentoBins = (voltage, wavelength) => ({
     voltage: { current: voltage.current, tolerance: '±0.05 V', source: 'p.4 §6.2', rows: binRows(voltage.rows) },
     wavelength: { current: wavelength.current, tolerance: wavelength.tolerance ?? '±1 nm', source: 'p.4 §6.3', rows: binRows(wavelength.rows) },
@@ -148,6 +144,9 @@ Object.assign(LEDS, {
     },
 });
 
+Object.assign(SOURCES, EVERLIGHT_SOURCES);
+Object.assign(LEDS, EVERLIGHT_LEDS);
+for (const l of Object.values(LEDS)) l.group ??= l.id.startsWith('KT-') ? 'KENTO 0805' : 'Kingbright 0805';
 export const BJTS = {
     npn: {
         id: 'MMBT3904LT1G', name: 'MMBT3904LT1G · onsemi', source: 'npn', polarity: 'npn', ratio: 10,

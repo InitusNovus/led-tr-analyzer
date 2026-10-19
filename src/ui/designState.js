@@ -45,7 +45,7 @@ export function designReducer(state, action) {
             const cap = opticalCapability(LEDS[action.id]);
             const fallback = state.targetKind === 'mcd' && !cap.canInvert;
             return withConfig(state, { ...state.config, led: action.id, ledBin: null }, {
-                selectedInstance: 'LED1', opticalBasis: cap.hasRange ? 'min' : 'typ',
+                selectedInstance: 'LED1', opticalBasis: cap.hasMin ? 'min' : 'typ',
                 targetKind: fallback ? 'current' : state.targetKind,
                 opticalNotice: fallback ? '선택 LED에 광도 역산 근거가 없어 전류 목표로 돌아왔습니다. 이전 mcd 입력값은 보존했습니다.' : '',
             });

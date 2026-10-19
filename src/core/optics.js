@@ -12,11 +12,12 @@ function sampleRelative(curve, x, ctx, label) {
 export const opticalCapability = (ledOrId,binId=null) => {
     const p=typeof ledOrId==='string'?ledModel(ledOrId,binId):ledOrId, o=p?.optical;
     if(!o || !Number.isFinite(o.testCurrent) || o.testCurrent<=0) return {kind:'unavailable',reason:'absolute-optical-test-current-unknown',canInvert:false};
-    const hasRange=Number.isFinite(o.minMcd)&&Number.isFinite(o.maxMcd);
+    const hasMin=Number.isFinite(o.minMcd);   // a guaranteed minimum (min/typ sheets) or the lower end of a range
+    const hasRange=hasMin&&Number.isFinite(o.maxMcd);
     const hasTypical=Number.isFinite(o.nominalMcd);
-    if(!hasRange&&!hasTypical) return {kind:'unavailable',reason:'no-complete-optical-anchor',canInvert:false};
+    if(!hasMin&&!hasTypical) return {kind:'unavailable',reason:'no-complete-optical-anchor',canInvert:false};
     const kind=o.relative ? (hasRange?'range':'scalar') : 'test-point';
-    return {kind,hasRange,hasTypical,canInvert:!!o.relative};
+    return {kind,hasRange,hasMin,hasTypical,canInvert:!!o.relative};
 };
 function unavailable(reason,anchor=null,assumptions=[]) {
     return {kind:'unavailable',reason,minMcd:null,maxMcd:null,nominalMcd:null,
@@ -55,9 +56,9 @@ export function opticalAtCurrent(id,current,temperature=25,ctx,binId=null) {
         convention:o.convention??''};
     if(current===0) {
         const output={kind:cap.kind==='test-point'?'scalar':cap.kind,nominalMcd:cap.hasTypical?0:null,
-            minMcd:cap.hasRange?0:null,maxMcd:cap.hasRange?0:null,
+            minMcd:cap.hasMin?0:null,maxMcd:cap.hasRange?0:null,
             anchor,scale:0,assumptions:['zero-current DC emission assumed zero'],extrapolated:false};
-        return {...output,usageGuide:null,basis:cap.hasRange?'datasheet-bin-scaled-typical-relative-Iv':'scalar-typical-relative-Iv'};
+        return {...output,usageGuide:null,basis:cap.hasRange?'datasheet-bin-scaled-typical-relative-Iv':cap.hasMin?'datasheet-min-typ-scaled-relative-Iv':'scalar-typical-relative-Iv'};
     }
     if(!o.relative) {
         if(temperature!==25 || Math.abs(current-o.testCurrent)>Math.max(1e-9,o.testCurrent*.01)){
@@ -90,13 +91,13 @@ export function opticalAtCurrent(id,current,temperature=25,ctx,binId=null) {
         ctx?.flags?.add('approximation:optical-temperature-separable');
     }
     const scale=sample.value/at.value*factor;
-    const minMcd=cap.hasRange?Math.max(0,o.minMcd*scale):null;
+    const minMcd=cap.hasMin?Math.max(0,o.minMcd*scale):null;
     const maxMcd=cap.hasRange?Math.max(0,o.maxMcd*scale):null;
     const nominalMcd=cap.hasTypical?Math.max(0,o.nominalMcd*scale):null;
     const guide=opticalUsageGuide(minMcd??nominalMcd,maxMcd??nominalMcd);
     return {kind:cap.kind,nominalMcd,minMcd,maxMcd,anchor,scale,
         assumptions,extrapolated,
-        basis:cap.hasRange?'datasheet-bin-scaled-typical-relative-Iv':'scalar-typical-relative-Iv',
+        basis:cap.hasRange?'datasheet-bin-scaled-typical-relative-Iv':cap.hasMin?'datasheet-min-typ-scaled-relative-Iv':'scalar-typical-relative-Iv',
         usageGuide:guide};
 }
 export function opticalValueForBasis(result,basis) {
@@ -112,7 +113,7 @@ export function solveOpticalCurrent(id,targetMcd,{basis='min',temperature=25,bin
     finite(targetMcd,'target mcd',Number.MIN_VALUE,1e7);
     const part=ledModel(id,bin),o=part?.optical,cap=opticalCapability(part);
     if(!o?.relative||!cap.canInvert) throw new ModelError('unsupported','광도 곡선 또는 절대 시험전류가 없어 역산할 수 없습니다.');
-    if(basis==='min'&&!cap.hasRange||basis==='typ'&&!cap.hasTypical||
+    if(basis==='min'&&!cap.hasMin||basis==='typ'&&!cap.hasTypical||
        basis==='representative'&&!cap.hasRange||!['min','typ','representative'].includes(basis))
         throw new ModelError('unsupported','선택 광도 기준의 absolute anchor가 없습니다.');
     if(temperature!==25&&!o.temperature)throw new ModelError('unsupported','선택 LED의 광학 온도 곡선이 없습니다.');

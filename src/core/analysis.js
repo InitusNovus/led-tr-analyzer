@@ -148,7 +148,7 @@ export function selectResistance(input,targetCurrent,{series='E24+E96',strategy=
     const c=normalizeConfig(input),t=topologyById(c.topology);let target=targetCurrent;
     if(!t.supportedOperations.includes('size'))throw new ModelError('unsupported','이 토폴로지는 RLED 자동 역산을 지원하지 않습니다.');
     let opticalGoal=null;
-    const resolvedBasis=opticalBasis==='auto'?(opticalCapability(c.led,c.ledBin).hasRange?'min':'typ'):opticalBasis;
+    const resolvedBasis=opticalBasis==='auto'?(opticalCapability(c.led,c.ledBin).hasMin?'min':'typ'):opticalBasis;
     if(targetMcd!==null){
         opticalGoal=solveOpticalCurrent(c.led,targetMcd,{basis:resolvedBasis,temperature:c.temperature,bin:c.ledBin});
         target=opticalGoal.current;
