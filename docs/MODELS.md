@@ -12,7 +12,12 @@
 
 | 모델 | 문서 / 읽은 범위 | 모델 특성 |
 |---|---|---|
-| APT2012SURCK | [Kingbright V.21A, 2025-03-17](https://www.kingbrightusa.com/images/catalog/SPEC/APT2012SURCK.pdf), p.1~3 | If–Vf, 상대 광도–If/T, 전류 디레이팅 |
+| APT2012SURCK (적색) | [Kingbright V.21A, 2025-03-17](https://www.kingbrightusa.com/images/catalog/SPEC/APT2012SURCK.pdf), p.1~3 | If–Vf, 상대 광도–If/T, 전류 디레이팅; Iv min 120 / typ 230 mcd |
+| APT2012SYCK (황색) | [Kingbright V.19B, 2025-03-17](https://www.kingbrightusa.com/images/catalog/SPEC/APT2012SYCK.pdf), p.1~3 | 위와 같음; Iv min 80 / typ 150 mcd |
+| APT2012CGCK (녹색 AlGaInP) | [Kingbright V.22B, 2025-03-14](https://www.kingbrightusa.com/images/catalog/SPEC/APT2012CGCK.pdf), p.1~3 | 위와 같음; Iv min 20 / typ 50 mcd |
+| APT2012SECK (주황) | [Kingbright V.17A, 2025-03-17](https://www.kingbrightusa.com/images/catalog/SPEC/APT2012SECK.pdf), p.1~3 | 위와 같음; Iv min 120 / typ 250 mcd |
+| APT2012ZGCK (녹색 InGaN) | [Kingbright V.9B, 2025-03-17](https://www.kingbrightusa.com/images/catalog/SPEC/APT2012ZGCK.pdf), p.1~3 | 위와 같음; Iv min 300 / typ 550 mcd, DC 25 mA, TCV −2.9 mV/°C |
+| APT2012QBC/D (청색) | [Kingbright V.16B, 2025-03-17](https://www.kingbrightusa.com/images/catalog/SPEC/APT2012QBC-D.pdf), p.1~3 | 위와 같음; Iv min 40 / typ 100 mcd, TCV −2.9 mV/°C |
 | MMBT3904LT1G | [onsemi Rev.14, 2021-08](https://www.onsemi.com/download/data-sheet/pdf/mmbt3904lt1-d.pdf), Fig.15/17/18/19 | gain, VCEsat, VBEsat, 활성영역 VBE |
 | BC847B | [Nexperia BC847x series Rev.13, 2022-07-01](https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf), Fig.6~9 | 선택 가능한 두 번째 NPN; gain/VBE/VCEsat/VBEsat 전형곡선 |
 | BSS138BKW | [Nexperia Rev.1, 2011-08-12](https://assets.nexperia.com/documents/data-sheet/BSS138BKW.pdf), Fig.6/7 및 Table7 | 선택 가능한 두 번째 NMOS; VGS별 output curve와 저게이트 근사 |
@@ -167,7 +172,9 @@ family에 후보가 한 개뿐이어도 실제 model ID를 감추지 않습니�
 
 정상 구간의 Vf는 수동 곡선 점을 구간별 보간합니다. 첫 유효 전류보다 작은 구간에는 처음 두 점에 연결되는 로그 형태의 tail을 사용하며 **외삽**으로 표시합니다. 원점의 임의 직선이 저전류 LED를 수백 Ω의 저항처럼 만들지 않도록 하기 위한 선택이지 측정 데이터가 아닙니다. 상한 밖에서는 끝 구간 연장과 외삽 경고를 사용합니다.
 
-APT2012SURCK의 −1.9mV/°C는 20mA에서의 값입니다. 전체 곡선에 적용한 온도 보정은 근사로 표시합니다. 광도 230mcd는 p.1의 **별표 없는** 광도 기준이며, CIE127-2007 별표의 80mcd 값과 혼합하지 않습니다. 상대 광도 곡선과 온도 곡선의 곱 역시 분리 가능하다는 근사입니다. 출력은 LED 하나의 추정 광도이며 사람의 체감 밝기나 직렬 LED 전체 광도의 합이 아닙니다.
+APT2012SURCK의 −1.9mV/°C는 20mA에서의 값입니다. 전체 곡선에 적용한 온도 보정은 근사로 표시합니다. 광도 min/typ는 p.1의 **별표 없는** 행(SURCK 120/230, SECK 120/250)이며, 같은 품번에 병기된 CIE127-2007 별표 값(SURCK *40/*80, SECK *80/*180)과 혼합하지 않습니다.
+
+APT2012 6종의 곡선(Vf–If, Iv–If, 열화, Iv–Ta)은 `scripts/digitize_kingbright.py`가 PDF 벡터 경로를 눈금 숫자 기준으로 환산한 값입니다(눈금 맞춤 잔차 ≤0.33pt). 20mA에서의 Vf는 모두 시트 표의 typ ±0.1V(시트 허용오차) 안입니다. 기본 LED인 SURCK만은 이슈 기준 수치를 유지하기 위해 기존 곡선을 그대로 두었고(판독값과 Vf 0.01V·Iv 2% 이내로 일치), 나머지 5종은 판독값을 씁니다. 별표 값과 허용오차(Iv ±15 %, Vf ±0.1 V)는 각 품번 notes에 있습니다. 상대 광도 곡선과 온도 곡선의 곱 역시 분리 가능하다는 근사입니다. 출력은 LED 하나의 추정 광도이며 사람의 체감 밝기나 직렬 LED 전체 광도의 합이 아닙니다.
 
 ### 일반 BJT
 
