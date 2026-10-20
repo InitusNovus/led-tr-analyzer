@@ -2,6 +2,7 @@ import React,{useEffect,useMemo,useReducer,useRef,useState}from'react';
 import{ArrowLeft,Download,ExternalLink,RotateCcw,Zap,ChevronRight}from'lucide-react';
 import{TOPOLOGIES,topologyById,topologyUsesGPIO}from'./core/topologies.js';
 import{designReducer,initialDesignState}from'./ui/designState.js';
+import{loadDesignState,saveDesignState}from'./ui/persist.js';
 import{startCornerRun}from'./ui/cornerRunner.js';
 import{analyzePoint,analyzeCorners,selectResistance}from'./core/analysis.js';
 import{evaluateGoal,goalDrift,intentFromGoal}from'./core/goal.js';
@@ -57,7 +58,8 @@ function Inspector({view}){
  </div>;
 }
 export default function App(){
- const[state,dispatch]=useReducer(designReducer,undefined,initialDesignState);
+ const[state,dispatch]=useReducer(designReducer,undefined,loadDesignState);
+ useEffect(()=>{saveDesignState(state)},[state]);
  const{config,mode,targetMa,targetMcd,targetKind,opticalBasis,opticalNotice,series,strategy,criterion,tolerancePct,appliedGoal,marginPct,cornerSnapshot,cornersStale,includeDtc,selectedInstance}=state;
  const patch=(p,invalidate=false)=>dispatch({type:'patch',patch:p,invalidate});
  const setMode=v=>patch({mode:v}),setTargetMa=v=>patch({targetMa:v}),setTargetMcd=v=>patch({targetMcd:v}),
