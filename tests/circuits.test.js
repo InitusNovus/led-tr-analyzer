@@ -100,8 +100,10 @@ test('zero brightness/current sizing fails cleanly, no synthetic 0Ω', () => {
     assert.ok(range.result.ok);
 });
 test('optical target inversion uses the selected LED optical model', () => {
-    const r = selectResistance(DEFAULT_CONFIG, .01, { targetMcd: 115 });
+    const r = selectResistance(DEFAULT_CONFIG, .01, { targetMcd: 115, opticalBasis: 'typ' });
     near(r.targetCurrent, .01, 1e-8);
+    // the default LED's sheet also guarantees 120 mcd minimum at 20 mA: an unqualified goal is read against that
+    assert.equal(selectResistance(DEFAULT_CONFIG, .01, { targetMcd: 60 }).goal.basis, 'min');
 });
 test('supply/resistor grids retain power consistency and finite results', () => {
     for (const t of TOPOLOGIES)

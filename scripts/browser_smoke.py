@@ -36,6 +36,8 @@ console.log(JSON.stringify(out))"""],cwd=ROOT,text=True))
   # appear; G01 turns this off (window.__autoUnfold=false) to verify the default and the focus-opens-the-fold behaviour.
   page.add_init_script("""window.__autoUnfold=true;new MutationObserver(()=>{if(window.__autoUnfold)document.querySelectorAll('details.fold:not([open])').forEach(d=>{d.open=true;});}).observe(document,{childList:true,subtree:true});""")
   page.on('pageerror',lambda e:errors.append(str(e)));page.on('console',lambda m:errors.append(m.text) if m.type=='error' else None)
+  # saved settings must not leak between scenarios: every load starts empty unless a scenario sets the sessionStorage 'keep' flag
+  page.add_init_script("try{if(!sessionStorage.getItem('keep'))localStorage.clear()}catch(e){}")
   def load():
    if INLINE:
     page.set_content('<html lang="ko"><head><meta charset="UTF-8"></head><body><div id="root"></div></body></html>');page.add_style_tag(content=next((ROOT/'dist/assets').glob('*.css')).read_text());page.add_script_tag(type='module',content=next((ROOT/'dist/assets').glob('*.js')).read_text())
@@ -553,7 +555,7 @@ console.log(JSON.stringify(out))"""],cwd=ROOT,text=True))
   groups=page.locator('#led optgroup').evaluate_all('els=>els.map(e=>e.label)')
   check(groups==['Kingbright 0805','KENTO 0805','Everlight 0805','Everlight 0603','Everlight 0402'],'LED list is grouped by family and package: '+str(groups))
   counts=page.locator('#led optgroup').evaluate_all('els=>els.map(e=>e.querySelectorAll("option").length)')
-  check(counts[2:]==[6,7,7],'Everlight sets are 6 (0805), 7 (0603), 7 (0402): '+str(counts))
+  check(counts==[6,7,6,7,7],'family sets are Kingbright 6, KENTO 7, Everlight 0805 6 / 0603 7 / 0402 7: '+str(counts))
   page.locator('#led').select_option('17-21UYC/S530-A3/4T')   # Iv min 40 / typ 62 mcd @20mA
   page.get_by_role('button',name='저항으로 검증',exact=True).click();page.locator('#resistance').fill('150')
   import re
@@ -586,6 +588,24 @@ console.log(JSON.stringify(out))"""],cwd=ROOT,text=True))
   btn.focus();expect(pop).to_be_visible()
   check(page.locator('.setup-panel .subtle').count()<=2,'no long static prose left in the setup panel: '+str(page.locator('.setup-panel .subtle').count()))
   check(float(page.evaluate("getComputedStyle(document.querySelector('.field small')).fontSize").replace('px',''))>=12,'secondary text is at least 12px')
+  scenario('G18')
+  # Last-used settings persist in localStorage across a reload; the reset button and defaults leave nothing behind.
+  load();page.get_by_role('button',name='전체 초기화',exact=True).click()
+  page.locator('#led').select_option('17-21UYC/S530-A3/4T')
+  page.get_by_role('button',name='저항으로 검증',exact=True).click();page.locator('#resistance').fill('470')
+  page.evaluate("sessionStorage.setItem('keep','1')")
+  page.reload(wait_until='networkidle')
+  check(page.locator('#led').input_value()=='17-21UYC/S530-A3/4T','LED choice survives a reload')
+  check(page.locator('#resistance').input_value()=='470','resistance survives a reload: '+page.locator('#resistance').input_value())
+  check(page.evaluate("Object.keys(localStorage).filter(k=>k.startsWith('led-tr-analyzer:')).length")==1,'one versioned entry is stored')
+  page.get_by_role('button',name='전체 초기화',exact=True).click()
+  check(page.evaluate("Object.keys(localStorage).filter(k=>k.startsWith('led-tr-analyzer:')).length")==0,'reset removes the saved entry')
+  page.reload(wait_until='networkidle')
+  check(page.locator('#led').input_value()=='APT2012SURCK','after reset a reload shows the defaults')
+  page.evaluate("localStorage.setItem('led-tr-analyzer:design:v1','{broken')")
+  page.reload(wait_until='networkidle')
+  check(page.locator('#led').input_value()=='APT2012SURCK' and page.locator('#resistance').count()+page.locator('#led').count()>0,'a corrupt entry falls back to the defaults without errors')
+  page.evaluate("sessionStorage.removeItem('keep')")
   check(not errors,'browser errors: '+str(errors));browser.close()
  print(json.dumps({'mode':'inline-artifact' if INLINE else 'http-pages-subpath','checks':checks,'scenarios':scenario_checks,'topologies':len(catalog),'browser_errors':errors},ensure_ascii=False))
 except Exception as e:
